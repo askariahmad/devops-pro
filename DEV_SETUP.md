@@ -95,27 +95,64 @@ This will quickly re-compile the Java code, create a new Docker image, and recre
 Once all containers are healthy, navigate to the frontend:
 - **URL**: `http://localhost:5173`
 
-### Database Seeding
-When the **Gateway Service** container starts up, it automatically executes a seeder script that populates the MongoDB container with mock users and tenant configurations.
+### Database Seeding & Test Users
+When the **Gateway Service** container starts up, it automatically executes a seeder script that populates the MongoDB container with multiple test users and varying Role-Based Access Control (RBAC) levels. 
 
-### Default Login Credentials
-Log into the local development environment using the seeded credentials:
-- **Email**: `sysadmin@devops.com`
-- **Password**: `password123`
+You can log into the local development environment using any of the following seeded credentials. **The password for all accounts is `password123`.**
+
+| Email | Role | Tenant ID | Permissions |
+|-------|------|-----------|-------------|
+| `sysadmin@devops.com` | `ROLE_SYSTEM_ADMIN` | `devops-com-tenant` | Full access to settings, auto-fix, and all incidents. |
+| `tenantadmin@devops.com` | `ROLE_TENANT_ADMIN` | `devops-com-tenant` | Can configure tenant-specific rules. |
+| `security@devops.com` | `ROLE_SECURITY_ENGINEER` | `devops-com-tenant` | Can view and trigger scans, but cannot change global settings. |
+| `dev@devops.com` | `ROLE_DEVELOPER_VIEWER` | `devops-com-tenant` | Read-only view of dashboards and incidents. |
+| `realuser@devops.com` | `ROLE_SYSTEM_ADMIN` | `real-tenant` | An isolated secondary tenant to test multi-tenant data partitioning. |
 
 ---
 
-## 7. Working with the Mock Endpoints 🧪
+## 7. Connecting Integrations (Mock vs Real) 🔌
 
-To test the application without needing real API tokens for external platforms:
+The application allows you to seamlessly toggle between internal Mock data (for fast, offline UI development) and real, live platforms.
 
+### 7.1 Using the Internal Mock Endpoints
+To test the application without needing real API tokens:
 1. Log into the Dashboard UI at `http://localhost:5173`.
 2. Go to the **Settings** page.
-3. Ensure the Integration Settings for SonarCloud and Splunk are pointing to the internal mock endpoints running inside the Docker network:
+3. Ensure the Integration Settings are pointing to the internal mock endpoints running inside the Docker network:
    - **SonarCloud Mock URL**: `http://repo-scanner-service:8085/api/v1/scanner/mock`
    - **Splunk Mock URL**: `http://log-collector-service:8083/mock/services/collector/event`
    
 *(Notice how we use the Docker container names like `repo-scanner-service` instead of `localhost`! This is because the services communicate internally across the Docker bridge network).*
+
+### 7.2 Connecting Real Integrations
+If you want the platform to interact with live production code, you can easily connect your real instances:
+
+#### A. Real GitHub Integration (Auto-Fix)
+To enable the AI to actually create branches, commit code, and open Pull Requests:
+1. Go to your GitHub account -> **Settings** -> **Developer Settings** -> **Personal Access Tokens (Tokens (classic))**.
+2. Generate a new token with `repo` (Full control of private repositories) permissions.
+3. In the DevOps Pro UI, go to **Settings**, paste this token into the **GitHub Personal Access Token** field, and hit Save.
+
+#### B. Real SonarQube / SonarCloud Integration
+1. In SonarCloud, go to **My Account** -> **Security** -> **Generate Tokens**.
+2. Create a token and copy it.
+3. In the DevOps Pro UI, change the **SonarQube URL** to `https://sonarcloud.io` (or your on-premise URL).
+4. Paste the generated token into the **SonarQube Token** field and save.
+
+#### C. Real Splunk / Datadog Integration
+1. In Splunk Enterprise, enable the **HTTP Event Collector (HEC)**.
+2. Generate a new HEC token.
+3. In the DevOps Pro UI, change the **Splunk HEC URL** to your real Splunk instance (e.g., `https://splunk.yourcompany.com:8088/services/collector/event`).
+4. Paste the HEC token into the **Splunk Token** field and save.
+
+#### D. Real LLM Providers (OpenAI vs Ollama)
+By default, the `docker-compose.yml` spins up a local Ollama container running `deepseek-coder`. 
+If you want to use OpenAI (GPT-4o) for faster, more accurate vulnerability analysis:
+1. Go to the UI **Settings** -> **LLM Provider**.
+2. Select **OpenAI** from the dropdown.
+3. Enter your real `sk-...` API key into the **OpenAI API Key** field.
+4. Click **Test LLM Connection**. The config service will make a live call to `api.openai.com` to verify your key.
+5. Hit **Save**. The next time you trigger a Repo Scan, the LangChain4j module will route the prompt to GPT-4o!
 
 ---
 
