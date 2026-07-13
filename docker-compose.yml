@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -18,11 +20,11 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      # Single listener — both Docker-internal and host services connect via localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Dual listeners: INTERNAL for Docker containers, EXTERNAL for host machine
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -38,6 +40,121 @@ services:
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
+    networks:
+      - devops-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: devops-mongodb
+    ports:
+      - "27017:27017"
+    networks:
+      - devops-network
+
+  config-service:
+    build:
+      context: ./config-service
+    container_name: devops-config-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - mongodb
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_config
+    networks:
+      - devops-network
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+    container_name: devops-gateway-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongodb
+      - config-service
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_users
+    networks:
+      - devops-network
+
+  incident-service:
+    build:
+      context: ./incident-service
+    container_name: devops-incident-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      - kafka
+      - mongodb
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_incidents
+    networks:
+      - devops-network
+
+  repo-scanner-service:
+    build:
+      context: ./repo-scanner-service
+    container_name: devops-repo-scanner-service
+    ports:
+      - "8085:8085"
+    depends_on:
+      - kafka
+      - redis
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_REDIS_HOST: redis
+    networks:
+      - devops-network
+
+  log-analyzer-service:
+    build:
+      context: ./log-analyzer-service
+    container_name: devops-log-analyzer-service
+    ports:
+      - "8086:8086"
+    depends_on:
+      - kafka
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - devops-network
+
+  log-collector-service:
+    build:
+      context: ./log-collector-service
+    container_name: devops-log-collector-service
+    ports:
+      - "8087:8087"
+    depends_on:
+      - kafka
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - devops-network
+
+  notification-service:
+    build:
+      context: ./notification-service
+    container_name: devops-notification-service
+    ports:
+      - "8088:8088"
+    depends_on:
+      - mongodb
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_notifications
+    networks:
+      - devops-network
+
+  dashboard-ui:
+    build:
+      context: ./dashboard-ui
+    container_name: devops-dashboard-ui
+    ports:
+      - "5173:80"
+    depends_on:
+      - gateway-service
     networks:
       - devops-network
 
