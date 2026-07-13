@@ -4,7 +4,7 @@ The `dev` environment is heavily containerized. It mocks massive external system
 
 ## 1. Local Architecture
 - **Docker Compose**: Uses `docker-compose.yml` (Base) + `docker-compose.dev.yml` (Overrides).
-- **Ollama**: We run `qwen2.5-coder:0.5b` locally to process LLM requests without cloud API keys.
+- **Ollama**: We run `qwen2.5-coder:1.5b` locally to process LLM requests without cloud API keys.
 - **Mock Splunk**: The Log Collector service has a scheduled job that randomly emits mock Splunk security events to Kafka.
 
 ## 2. Setting Up External Services (For `realuser`)

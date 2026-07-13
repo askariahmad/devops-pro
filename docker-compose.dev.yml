@@ -26,13 +26,13 @@ services:
       - "11434:11434"
     networks:
       - devops-network
-    # A lightweight model will be used: qwen2.5-coder:0.5b
+    # A lightweight model will be used: qwen2.5-coder:1.5b
     # This requires an entrypoint override to automatically pull the model if it doesn't exist
     entrypoint: >
       /bin/sh -c "
       ollama serve &
       sleep 5 &&
-      ollama pull qwen2.5-coder:0.5b &&
+      ollama pull qwen2.5-coder:1.5b &&
       wait
       "
 

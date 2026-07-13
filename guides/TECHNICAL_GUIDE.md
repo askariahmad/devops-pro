@@ -24,7 +24,7 @@ The `config-service` acts as the source of truth for all LLM routing. The `repo-
 ### Local LLM (Ollama)
 In the `dev` environment, the active LLM provider defaults to `ollama`. 
 - Requests are routed to `http://ollama:11434`.
-- The `qwen2.5-coder:0.5b` model is used. This is a lightweight (<1GB) coding-specific model that runs purely on CPU, allowing developers to test AI reasoning flows entirely offline without incurring cloud API costs.
+- The `qwen2.5-coder:1.5b` model is used. This is a lightweight (<1GB) coding-specific model that runs purely on CPU, allowing developers to test AI reasoning flows entirely offline without incurring cloud API costs.
 
 ### External LLMs
 In higher environments, the platform connects to OpenAI or Azure OpenAI using securely injected API keys. The services utilize a Distributed Redis Cache to ensure that multiple identical AI analyses (e.g., encountering the exact same CVE across different microservices) only hit the expensive external LLM APIs once.
