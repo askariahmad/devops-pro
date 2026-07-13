@@ -79,6 +79,43 @@ graph TD
 
 ---
 
+## 📡 Kafka Architecture & Event Flow
+
+The platform relies heavily on Apache Kafka to decouple data ingestion from AI processing and alerting.
+
+```mermaid
+sequenceDiagram
+    participant Splunk as External: Splunk/Datadog
+    participant LC as Log Collector Service
+    participant K_RAW as Kafka: raw-logs
+    participant LA as Log Analyzer Service
+    participant RS as Repo Scanner Service
+    participant K_ENR as Kafka: enriched-alerts
+    participant IS as Incident Service
+    participant K_NOT as Kafka: incident-notifications
+    participant NS as Notification Service
+
+    %% Background Telemetry Flow
+    Splunk->>LC: Polls raw telemetry
+    LC->>K_RAW: Publishes raw log payload
+    K_RAW->>LA: Consumes raw logs
+    Note over LA: LangChain4j checks<br/>LLM for anomalies
+    LA->>K_ENR: Publishes anomaly alert
+
+    %% Proactive Scanning Flow
+    Note over RS: User triggers scan
+    RS->>K_ENR: Publishes vulnerability alert
+
+    %% Ticketing & Alerting Flow
+    K_ENR->>IS: Consumes enriched alerts
+    Note over IS: Deduplicates & saves<br/>to MongoDB
+    IS->>K_NOT: Publishes notification event
+    K_NOT->>NS: Consumes event
+    NS->>External Webhook/Slack: Dispatches alert
+```
+
+---
+
 ## 🔄 In-Depth Application Flows
 
 ### 1. The Proactive Code Scanning & Auto-Fix Flow
