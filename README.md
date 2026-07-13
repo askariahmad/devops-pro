@@ -193,6 +193,54 @@ erDiagram
 
 ---
 
+## 🛠️ Automated Remediation (Auto-Fix) Flow
+
+A cornerstone feature of DevOps Pro is its ability to not just identify issues, but actively fix them by interacting with GitHub.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Dashboard UI
+    participant RS as Repo Scanner Service
+    participant LLM as AI / LangChain4j
+    participant GH as GitHub API
+
+    User->>UI: Clicks "Auto-Fix" on Vulnerability
+    UI->>RS: POST /api/v1/scanner/auto-fix/{id}
+    RS->>LLM: Requests specific git diff patch
+    LLM-->>RS: Returns valid git diff block
+    
+    RS->>GH: Create branch (e.g., fix/s3649-sql-injection)
+    GH-->>RS: Branch created
+    
+    RS->>GH: Commit and Push patch
+    GH-->>RS: Commit successful
+    
+    RS->>GH: Open Pull Request
+    GH-->>RS: PR URL created
+    
+    RS-->>UI: Return PR URL
+    UI-->>User: Displays link to GitHub PR
+```
+
+---
+
+## 🌐 API Endpoints Cheat Sheet
+
+Below are the most critical REST endpoints. All traffic routes through the API Gateway (`http://localhost:8080`) and requires a Bearer JWT token (except Login).
+
+| Service | Endpoint | Method | Purpose |
+|---------|----------|--------|---------|
+| **Gateway** | `/api/v1/auth/login` | `POST` | Authenticates user & returns JWT |
+| **Config** | `/api/v1/config/settings` | `GET/PUT` | Manages Tenant integrations & LLMs |
+| **Config** | `/api/v1/config/test-connection/{prov}`| `POST` | Tests connectivity to Ollama/OpenAI/Splunk |
+| **Scanner** | `/api/v1/scanner/scan?repo={name}` | `POST` | Triggers a proactive SAST repository scan |
+| **Scanner** | `/api/v1/scanner/auto-fix/{id}` | `POST` | Triggers the GitHub auto-fix PR sequence |
+| **Scanner** | `/api/v1/scanner/regenerate/{id}` | `POST` | Evicts Redis cache and forces a new LLM analysis |
+| **Incident**| `/api/v1/incidents` | `GET` | Fetches all deduplicated, enriched alerts |
+
+---
+
 ## 🔄 In-Depth Application Flows
 
 ### 1. The Proactive Code Scanning & Auto-Fix Flow
