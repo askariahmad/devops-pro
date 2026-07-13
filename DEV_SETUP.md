@@ -130,29 +130,43 @@ If you want the platform to interact with live production code, you can easily c
 #### A. Real GitHub Integration (Auto-Fix)
 To enable the AI to actually create branches, commit code, and open Pull Requests:
 1. Go to your GitHub account -> **Settings** -> **Developer Settings** -> **Personal Access Tokens (Tokens (classic))**.
-2. Generate a new token. **Required Scopes**:
-   - `repo` (Full control of private repositories - needed to read files, create branches, and push commits).
-   - If using Fine-Grained Tokens instead: Grant `Read & Write` access to **Code** and **Pull Requests**.
-3. In the DevOps Pro UI, go to **Settings**, paste this token into the **GitHub Personal Access Token** field, and hit Save.
+2. **If using a Classic Token**, check the following exact boxes:
+   - `[x] repo` (Full control of private repositories)
+3. **If using Fine-Grained Tokens (Recommended)**, set the following exact Repository Permissions:
+   - **Contents**: `Read and write` (to fetch source code and push new commits)
+   - **Pull requests**: `Read and write` (to open the auto-fix PR)
+   - **Metadata**: `Read-only` (mandatory default)
+4. In the DevOps Pro UI, go to **Settings**, paste this token into the **GitHub Personal Access Token** field, and hit Save.
 
 #### B. Real SonarQube / SonarCloud Integration
 1. In SonarCloud, go to **My Account** -> **Security** -> **Generate Tokens**.
-2. Create a "User Token" and copy it. **Required Permissions**: The user generating the token must have at least `Browse` permissions on the targeted project to fetch issues and source code.
-3. In the DevOps Pro UI, change the **SonarQube URL** to `https://sonarcloud.io` (or your on-premise URL).
-4. Paste the generated token into the **SonarQube Token** field and save.
+2. Create a "User Token" and copy it. 
+3. **Required Exact Permissions**: The user who generates this token must have the following project-level permissions in SonarQube/SonarCloud Administration:
+   - `[x] Browse` (Required to view the project)
+   - `[x] See Source Code` (Required to fetch the vulnerable lines of code)
+   - `[x] Administer Issues` (Optional, but recommended if you plan to auto-resolve issues later)
+4. In the DevOps Pro UI, change the **SonarQube URL** to `https://sonarcloud.io` (or your on-premise URL).
+5. Paste the generated token into the **SonarQube Token** field and save.
 
 #### C. Real Splunk / Datadog Integration
-1. In Splunk Enterprise, enable the **HTTP Event Collector (HEC)**.
-2. Generate a new HEC token. **Required Permissions**: Ensure the token is mapped to an active `index` (e.g., `main`) so it can successfully ingest incoming telemetry data.
-3. In the DevOps Pro UI, change the **Splunk HEC URL** to your real Splunk instance (e.g., `https://splunk.yourcompany.com:8088/services/collector/event`).
-4. Paste the HEC token into the **Splunk Token** field and save.
+1. In Splunk Enterprise, go to **Settings** -> **Data Inputs** -> **HTTP Event Collector**.
+2. Click **New Token**.
+3. **Required Exact Configuration**:
+   - **Enable Indexer Acknowledgment**: `Unchecked` (or checked based on your reliability needs)
+   - **Source type**: Set to `_json` or `Automatic`
+   - **Allowed Indexes**: Select `main` (or whichever specific index you want alerts routed to)
+   - **Default Index**: Set to `main`
+4. In the DevOps Pro UI, change the **Splunk HEC URL** to your real Splunk instance (e.g., `https://splunk.yourcompany.com:8088/services/collector/event`).
+5. Paste the HEC token into the **Splunk Token** field and save.
 
 #### D. Real LLM Providers (OpenAI vs Ollama)
 By default, the `docker-compose.yml` spins up a local Ollama container running `deepseek-coder`. 
 If you want to use OpenAI (GPT-4o) for faster, more accurate vulnerability analysis:
 1. Go to the UI **Settings** -> **LLM Provider**.
 2. Select **OpenAI** from the dropdown.
-3. Enter your real `sk-...` API key into the **OpenAI API Key** field. **Required Permissions**: Standard API keys require no special scopes, but ensure your organization has sufficient credit balance and access to the `gpt-4o` or `gpt-4o-mini` models.
+3. Enter your real `sk-...` API key into the **OpenAI API Key** field.
+4. **Required Exact Permissions**: Standard API keys require no special scopes. However, if using a **Project API Key**, ensure it has:
+   - **Model Access**: `Read/Write` access specifically to the `gpt-4o` or `gpt-4o-mini` models.
 4. Click **Test LLM Connection**. The config service will make a live call to `api.openai.com` to verify your key.
 5. Hit **Save**. The next time you trigger a Repo Scan, the LangChain4j module will route the prompt to GPT-4o!
 
