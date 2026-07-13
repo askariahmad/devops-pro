@@ -116,6 +116,83 @@ sequenceDiagram
 
 ---
 
+## 🧠 AI Inference & Caching Flow
+
+To optimize token usage, minimize latency, and prevent redundant LLM calls for identical static analysis findings across different repositories, the platform employs a sophisticated caching architecture.
+
+```mermaid
+flowchart TD
+    Req[Incoming Scan Request] --> Hash[Generate SHA-256 Hash of Vulnerability]
+    Hash --> Redis{Check Redis Cache}
+    
+    Redis -->|Cache Hit| Hit[Return Cached LLM Analysis & Git Diff]
+    
+    Redis -->|Cache Miss| LLM_Route{Determine Configured LLM}
+    
+    LLM_Route -->|Ollama| Local[Local: deepseek-coder]
+    LLM_Route -->|OpenAI| OAI[Cloud: gpt-4]
+    LLM_Route -->|Claude| Anthropic[Cloud: claude-3]
+    
+    Local --> LC[LangChain4j Processing]
+    OAI --> LC
+    Anthropic --> LC
+    
+    LC --> SaveCache[Store Result in Redis TTL 7 Days]
+    SaveCache --> Final[Publish Enriched Alert]
+    Hit --> Final
+```
+
+---
+
+## 🗄️ Entity-Relationship Diagram (Multi-Tenancy)
+
+All MongoDB databases strictly enforce logical isolation using the `tenantId` field to support B2B SaaS operations.
+
+```mermaid
+erDiagram
+    TENANT ||--o{ USER : contains
+    TENANT ||--|| CONFIG : owns
+    TENANT ||--o{ INCIDENT : tracks
+    TENANT ||--o{ NOTIFICATION : generates
+
+    USER {
+        ObjectId id
+        string email
+        string passwordHash
+        string role
+        string tenantId
+    }
+
+    CONFIG {
+        ObjectId id
+        string tenantId
+        string githubToken
+        string sonarToken
+        string llmProvider
+        string llmApiKey
+    }
+
+    INCIDENT {
+        ObjectId id
+        string tenantId
+        string fingerprint
+        string severity
+        string aiExplanation
+        string gitDiffFix
+        string status
+    }
+
+    NOTIFICATION {
+        ObjectId id
+        string tenantId
+        string incidentId
+        string channel
+        string status
+    }
+```
+
+---
+
 ## 🔄 In-Depth Application Flows
 
 ### 1. The Proactive Code Scanning & Auto-Fix Flow
