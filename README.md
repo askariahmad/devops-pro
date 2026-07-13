@@ -298,7 +298,10 @@ Each microservice is entirely self-contained. For in-depth Low-Level Design (LLD
 - At least 8GB of RAM allocated to Docker.
 
 ### Running the Stack
-The entire application runs seamlessly via Docker Compose, requiring zero local dependencies. It automatically provisions Kafka, Zookeeper, Redis, MongoDB, and all 8 microservices.
+The entire application can be run seamlessly via Docker Compose, requiring zero local dependencies. It automatically provisions Kafka, Zookeeper, Redis, MongoDB, and all 8 microservices.
+
+**Want to run the services individually for local development?**
+Check out our extremely detailed **[Local Development Setup Guide (DEV_SETUP.md)](./DEV_SETUP.md)** which covers IDE setup, running the React frontend independently, default credentials, and mock configuration!
 
 ```bash
 # Clone the repository
