@@ -1,0 +1,24 @@
+[submodule "config-service"]
+	path = config-service
+	url = https://github.com/askariahmad/config-service.git
+[submodule "dashboard-ui"]
+	path = dashboard-ui
+	url = https://github.com/askariahmad/dashboard-ui.git
+[submodule "gateway-service"]
+	path = gateway-service
+	url = https://github.com/askariahmad/gateway-service.git
+[submodule "incident-service"]
+	path = incident-service
+	url = https://github.com/askariahmad/incident-service.git
+[submodule "log-analyzer-service"]
+	path = log-analyzer-service
+	url = https://github.com/askariahmad/log-analyzer-service.git
+[submodule "log-collector-service"]
+	path = log-collector-service
+	url = https://github.com/askariahmad/log-collector-service.git
+[submodule "notification-service"]
+	path = notification-service
+	url = https://github.com/askariahmad/notification-service.git
+[submodule "repo-scanner-service"]
+	path = repo-scanner-service
+	url = https://github.com/askariahmad/repo-scanner-service.git
