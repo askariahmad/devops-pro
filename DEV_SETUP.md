@@ -1,24 +1,24 @@
 # Local Development Setup Guide
 
-Welcome to the DevOps Pro Microservices contributor guide! This document provides an **extremely detailed, step-by-step walkthrough** of how to set up, build, and run the entire ecosystem locally for active development.
+Welcome to the DevOps Pro Microservices contributor guide! This document provides an **extremely detailed, step-by-step walkthrough** of how to set up, build, and run the entire ecosystem locally for active development. 
+
+The entire platform is built around a **fully Dockerized** workflow. You do not need to install Java, Maven, or Node.js on your local machine to run the application—Docker handles everything!
 
 ---
 
 ## 1. Prerequisites 🛠️
 
 Before you begin, ensure you have the following installed on your local machine:
-- **Java Development Kit (JDK) 21**: All Spring Boot microservices are built targeting Java 21.
-- **Apache Maven (3.8+)**: For building the Java backends.
-- **Node.js (18+ or 20+) & npm**: For running the React/Vite frontend.
-- **Docker & Docker Compose**: Required for running the backing infrastructure (MongoDB, Redis, Kafka, Zookeeper).
+- **Docker Desktop** (v4.20+) or Docker Engine (v24.0+)
+- **Docker Compose** (v2.20+)
 - **Git**: To clone the repository and its submodules.
-- **IDE**: IntelliJ IDEA (Ultimate or Community) or Visual Studio Code are highly recommended.
+- At least **8GB of RAM** allocated to Docker (12GB+ recommended) to comfortably run all microservices, databases, and LLM containers concurrently.
 
 ---
 
 ## 2. Cloning the Repository 📥
 
-Because this project utilizes Git submodules for each microservice, you must clone the repository recursively:
+Because this project utilizes Git submodules for each microservice, you must clone the repository recursively so that you pull the source code for all services:
 
 ```bash
 # Clone the root repository and all of its submodules
@@ -30,97 +30,76 @@ cd devops-pro
 
 ---
 
-## 3. Starting the Backing Infrastructure (Databases & Message Brokers) 🐳
+## 3. Building and Starting the Platform 🐳
 
-For local development, you do **not** want to run the microservices themselves inside Docker, because you want Hot Reloading and the ability to attach a debugger. However, you **do** want to run the databases and message brokers in Docker.
-
-We have a dedicated Docker Compose file for this. 
+We use a combination of `docker-compose.yml` (base infrastructure) and `docker-compose.dev.yml` (development overrides) to spin up the entire ecosystem.
 
 1. Open your terminal in the root `devops-pro` folder.
-2. Run the following command to start ONLY the infrastructure containers:
+2. Run the following command to build the Docker images from the local submodules and start all containers in the background:
 
 ```bash
-docker-compose up -d mongodb redis zookeeper kafka ollama-dev
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
+
+### What happens during this command?
+- Docker will build the Spring Boot `.jar` files inside multi-stage `Dockerfile`s using Maven.
+- It will build the React `dashboard-ui` into a static bundle served by Nginx.
+- It will pull and start all backing infrastructure (`mongo`, `redis`, `kafka`, `zookeeper`, `ollama-dev`).
+- It will orchestrate the startup of all 7 backend microservices, attaching them to a shared custom Docker network (`devops-network`).
 
 3. **Verify the containers are running**:
 ```bash
 docker ps
 ```
-You should see:
-- `devops-mongodb` running on port `27018` (mapped to `27017` internally).
-- `devops-redis` running on port `6379`.
-- `devops-kafka` running on port `9092`.
-- `devops-zookeeper` running on port `2181`.
-- `devops-ollama-dev` running on port `11434`.
+You should see around 13 containers running successfully, including:
+- `devops-dashboard-ui` (Port `5173`)
+- `devops-gateway-service` (Port `8080`)
+- `devops-mongodb` (Port `27018`)
+- `devops-kafka` (Port `9092`)
 
 ---
 
-## 4. Running the Backend Microservices (Spring Boot) ☕
+## 4. Monitoring Logs During Development 📜
 
-You have 7 Spring Boot microservices. You can run them using your IDE (by running the `@SpringBootApplication` classes) or via the terminal using Maven. 
+Since everything runs inside Docker, you will use Docker commands to monitor the logs of specific services when debugging:
 
-If running via the terminal, you must start them in a specific order to ensure dependencies (like the Config Service) are available:
-
-### Service Start Order:
-1. **Config Service** (Runs on `8082`)
-2. **Gateway Service** (Runs on `8080`)
-3. **Incident Service** (Runs on `8084`)
-4. **Log Collector Service** (Runs on `8083`)
-5. **Log Analyzer Service** (Runs on `8086`)
-6. **Repo Scanner Service** (Runs on `8085`)
-7. **Notification Service** (Runs on `8088`)
-
-### How to run via Terminal:
-Open a separate terminal tab for each service and run:
-
-```bash
-cd config-service
-mvn spring-boot:run
-```
-*(Repeat this for all 7 services in the order listed above)*
-
-### How to run via IntelliJ IDEA:
-1. Open the root `devops-pro` folder in IntelliJ.
-2. IntelliJ should detect it as a multi-module Maven project. Sync the Maven dependencies.
-3. Open the **Services** tool window (`View -> Tool Windows -> Services`).
-4. Add a new "Spring Boot" run configuration that includes all 7 Application classes (e.g., `ConfigApplication`, `GatewayApplication`, etc.).
-5. Click **Start All**.
+- **View API Gateway Logs**:
+  ```bash
+  docker logs -f devops-gateway-service
+  ```
+- **View Repo Scanner Logs**:
+  ```bash
+  docker logs -f devops-repo-scanner-service
+  ```
+- **View All Logs Simultaneously**:
+  ```bash
+  docker-compose logs -f
+  ```
 
 ---
 
-## 5. Running the Frontend Dashboard (React + Vite) ⚛️
+## 5. Rebuilding After Making Code Changes 🔄
 
-The Dashboard UI is a modern Vite application. It communicates with the backend exclusively through the API Gateway (`localhost:8080`).
+When you make changes to the source code of any microservice (e.g., modifying a Java class in `log-analyzer-service`), you need to rebuild that specific Docker container. You do **not** need to rebuild the entire platform.
 
-1. Open a new terminal tab and navigate to the frontend directory:
+**Example: Rebuilding only the Log Analyzer Service**
 ```bash
-cd dashboard-ui
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build log-analyzer-service
 ```
-
-2. Install the Node.js dependencies:
-```bash
-npm install
-```
-
-3. Start the Vite development server (which includes Hot Module Replacement):
-```bash
-npm run dev
-```
-
-4. The terminal will output a local URL (usually `http://localhost:5173`). Open this URL in your browser.
+This will quickly re-compile the Java code, create a new Docker image, and recreate just that specific container while leaving the rest of the ecosystem untouched.
 
 ---
 
 ## 6. Accessing the Application & Initial Data 🔑
 
-Once everything is running, navigate to `http://localhost:5173`.
+Once all containers are healthy, navigate to the frontend:
+- **URL**: `http://localhost:5173`
 
 ### Database Seeding
-When the **Gateway Service** starts, it automatically seeds the local MongoDB with mock users and tenant configurations.
+When the **Gateway Service** container starts up, it automatically executes a seeder script that populates the MongoDB container with mock users and tenant configurations.
 
 ### Default Login Credentials
-You can log into the local development environment using the following seeded credentials:
+Log into the local development environment using the seeded credentials:
 - **Email**: `sysadmin@devops.com`
 - **Password**: `password123`
 
@@ -128,26 +107,31 @@ You can log into the local development environment using the following seeded cr
 
 ## 7. Working with the Mock Endpoints 🧪
 
-To test the application without needing real API tokens for Splunk or SonarCloud:
+To test the application without needing real API tokens for external platforms:
 
-1. Log into the Dashboard UI.
+1. Log into the Dashboard UI at `http://localhost:5173`.
 2. Go to the **Settings** page.
-3. Ensure the LLM provider is set to use a mock or your preferred local LLM (like Ollama running `deepseek-coder`).
-4. Ensure the Integration Settings for SonarCloud and Splunk are pointing to the internal mock endpoints (e.g., `http://localhost:8085/api/v1/scanner/mock` or `http://localhost:8083/mock/services/collector/event`).
-5. **Important**: Since you are running the backend services on your host machine (not inside Docker), they will communicate with each other via `localhost:[port]` rather than the docker hostnames.
+3. Ensure the Integration Settings for SonarCloud and Splunk are pointing to the internal mock endpoints running inside the Docker network:
+   - **SonarCloud Mock URL**: `http://repo-scanner-service:8085/api/v1/scanner/mock`
+   - **Splunk Mock URL**: `http://log-collector-service:8083/mock/services/collector/event`
+   
+*(Notice how we use the Docker container names like `repo-scanner-service` instead of `localhost`! This is because the services communicate internally across the Docker bridge network).*
 
 ---
 
 ## 8. Common Local Development Pitfalls ⚠️
 
-### MongoDB Connection Refused
-- **Symptom**: Spring Boot services crash on startup with `MongoSocketOpenException`.
-- **Fix**: Ensure your local Docker MongoDB is running. Note that our `docker-compose.yml` maps MongoDB to port **`27018`** on your host machine to avoid conflicting with any native Windows/Mac MongoDB installations. Your local Spring Boot `.env` or `application.yml` profiles should point to `mongodb://localhost:27018`.
-
-### Kafka Broker Not Available
-- **Symptom**: `Broker may not be available` warnings in logs.
-- **Fix**: Ensure the `devops-kafka` and `devops-zookeeper` Docker containers are running. Kafka listens on `localhost:9092` from your host machine.
-
 ### API Gateway CORS Errors
 - **Symptom**: The React frontend throws CORS errors in the browser console.
-- **Fix**: The Gateway Service is configured to allow `http://localhost:5173`. If Vite assigns a different port (e.g., `5174`), you must either force Vite to use `5173` or update the CORS configuration in `gateway-service/src/main/resources/application.yml`.
+- **Fix**: The Gateway Service is configured to allow requests from `http://localhost:5173`. Ensure you are accessing the UI exactly via `http://localhost:5173` and not `127.0.0.1` or another port.
+
+### Kafka Broker Disconnects
+- **Symptom**: Microservices output `Broker may not be available` warnings and crash.
+- **Fix**: Kafka requires a few seconds to fully initialize and register with Zookeeper. If a microservice crashes because it started before Kafka was ready, simply restart the crashed service:
+  ```bash
+  docker restart devops-incident-service
+  ```
+
+### Out of Memory (OOM) Container Kills
+- **Symptom**: A container randomly stops or `docker ps` shows it as `Exited (137)`.
+- **Fix**: This means Docker Desktop ran out of allocated memory. 12+ containers (especially Spring Boot + LLMs) are memory intensive. Increase your Docker Engine memory limit in the Docker Desktop settings to at least 10GB.
