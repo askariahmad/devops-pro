@@ -40,3 +40,5 @@ volumes:
   ollama_data:
 
 # Networks definition is inherited from the base docker-compose.yml
+
+

@@ -47,13 +47,14 @@ services:
     image: mongo:latest
     container_name: devops-mongodb
     ports:
-      - "27017:27017"
+      - "27018:27017"
     networks:
       - devops-network
 
   config-service:
     build:
-      context: ./config-service
+      context: .
+      dockerfile: ./config-service/Dockerfile
     container_name: devops-config-service
     ports:
       - "8082:8082"
@@ -66,7 +67,8 @@ services:
 
   gateway-service:
     build:
-      context: ./gateway-service
+      context: .
+      dockerfile: ./gateway-service/Dockerfile
     container_name: devops-gateway-service
     ports:
       - "8080:8080"
@@ -75,12 +77,19 @@ services:
       - config-service
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_users
+      CONFIG_SERVICE_URL: http://config-service:8082
+      COLLECTOR_SERVICE_URL: http://log-collector-service:8083
+      ANALYZER_SERVICE_URL: http://log-analyzer-service:8081
+      SCANNER_SERVICE_URL: http://repo-scanner-service:8085
+      INCIDENT_SERVICE_URL: http://incident-service:8084
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
     networks:
       - devops-network
 
   incident-service:
     build:
-      context: ./incident-service
+      context: .
+      dockerfile: ./incident-service/Dockerfile
     container_name: devops-incident-service
     ports:
       - "8084:8084"
@@ -95,7 +104,8 @@ services:
 
   repo-scanner-service:
     build:
-      context: ./repo-scanner-service
+      context: .
+      dockerfile: ./repo-scanner-service/Dockerfile
     container_name: devops-repo-scanner-service
     ports:
       - "8085:8085"
@@ -105,12 +115,15 @@ services:
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_DATA_REDIS_HOST: redis
+      SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
+      SERVICES_INCIDENT_URL: http://incident-service:8084/api/v1/incidents
     networks:
       - devops-network
 
   log-analyzer-service:
     build:
-      context: ./log-analyzer-service
+      context: .
+      dockerfile: ./log-analyzer-service/Dockerfile
     container_name: devops-log-analyzer-service
     ports:
       - "8086:8086"
@@ -118,25 +131,32 @@ services:
       - kafka
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
+      SERVICES_INCIDENT_URL: http://incident-service:8084/api/v1/incidents
     networks:
       - devops-network
 
   log-collector-service:
     build:
-      context: ./log-collector-service
+      context: .
+      dockerfile: ./log-collector-service/Dockerfile
     container_name: devops-log-collector-service
     ports:
-      - "8087:8087"
+      - "8087:8083"
     depends_on:
       - kafka
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
+      SERVICES_ANALYZER_URL: http://log-analyzer-service:8081/api/v1/analyzer/logs
+      SPLUNK_MOCK_URL: http://localhost:8083/api/v1/mock/splunk/logs
     networks:
       - devops-network
 
   notification-service:
     build:
-      context: ./notification-service
+      context: .
+      dockerfile: ./notification-service/Dockerfile
     container_name: devops-notification-service
     ports:
       - "8088:8088"
@@ -161,3 +181,6 @@ services:
 networks:
   devops-network:
     driver: bridge
+
+
+
