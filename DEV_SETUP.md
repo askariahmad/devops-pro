@@ -130,18 +130,20 @@ If you want the platform to interact with live production code, you can easily c
 #### A. Real GitHub Integration (Auto-Fix)
 To enable the AI to actually create branches, commit code, and open Pull Requests:
 1. Go to your GitHub account -> **Settings** -> **Developer Settings** -> **Personal Access Tokens (Tokens (classic))**.
-2. Generate a new token with `repo` (Full control of private repositories) permissions.
+2. Generate a new token. **Required Scopes**:
+   - `repo` (Full control of private repositories - needed to read files, create branches, and push commits).
+   - If using Fine-Grained Tokens instead: Grant `Read & Write` access to **Code** and **Pull Requests**.
 3. In the DevOps Pro UI, go to **Settings**, paste this token into the **GitHub Personal Access Token** field, and hit Save.
 
 #### B. Real SonarQube / SonarCloud Integration
 1. In SonarCloud, go to **My Account** -> **Security** -> **Generate Tokens**.
-2. Create a token and copy it.
+2. Create a "User Token" and copy it. **Required Permissions**: The user generating the token must have at least `Browse` permissions on the targeted project to fetch issues and source code.
 3. In the DevOps Pro UI, change the **SonarQube URL** to `https://sonarcloud.io` (or your on-premise URL).
 4. Paste the generated token into the **SonarQube Token** field and save.
 
 #### C. Real Splunk / Datadog Integration
 1. In Splunk Enterprise, enable the **HTTP Event Collector (HEC)**.
-2. Generate a new HEC token.
+2. Generate a new HEC token. **Required Permissions**: Ensure the token is mapped to an active `index` (e.g., `main`) so it can successfully ingest incoming telemetry data.
 3. In the DevOps Pro UI, change the **Splunk HEC URL** to your real Splunk instance (e.g., `https://splunk.yourcompany.com:8088/services/collector/event`).
 4. Paste the HEC token into the **Splunk Token** field and save.
 
@@ -150,7 +152,7 @@ By default, the `docker-compose.yml` spins up a local Ollama container running `
 If you want to use OpenAI (GPT-4o) for faster, more accurate vulnerability analysis:
 1. Go to the UI **Settings** -> **LLM Provider**.
 2. Select **OpenAI** from the dropdown.
-3. Enter your real `sk-...` API key into the **OpenAI API Key** field.
+3. Enter your real `sk-...` API key into the **OpenAI API Key** field. **Required Permissions**: Standard API keys require no special scopes, but ensure your organization has sufficient credit balance and access to the `gpt-4o` or `gpt-4o-mini` models.
 4. Click **Test LLM Connection**. The config service will make a live call to `api.openai.com` to verify your key.
 5. Hit **Save**. The next time you trigger a Repo Scan, the LangChain4j module will route the prompt to GPT-4o!
 
