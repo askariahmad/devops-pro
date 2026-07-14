@@ -129,6 +129,8 @@ resource "kubernetes_deployment" "repo_scanner_service" {
           name  = "repo-scanner-service"
           env { name = "KAFKA_URL"
                 value = "http://localhost:4566" }
+          env { name = "SPRING_DATA_REDIS_HOST"
+                value = aws_elasticache_cluster.redis.cache_nodes[0].address }
         }
       }
     }

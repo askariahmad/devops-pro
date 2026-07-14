@@ -48,3 +48,17 @@ resource "aws_iam_role" "eks_cluster_role" {
 output "kubeconfig" {
   value = aws_eks_cluster.main.endpoint
 }
+
+resource "aws_elasticache_cluster" "redis" {
+  cluster_id           = "devops-redis-cluster"
+  engine               = "redis"
+  node_type            = "cache.t2.micro"
+  num_cache_nodes      = 1
+  parameter_group_name = "default.redis7"
+  engine_version       = "7.0"
+  port                 = 6379
+}
+
+output "redis_endpoint" {
+  value = aws_elasticache_cluster.redis.cache_nodes[0].address
+}
