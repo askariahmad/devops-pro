@@ -51,3 +51,19 @@ output "kubeconfig" {
   value     = azurerm_kubernetes_cluster.aks.kube_config_raw
   sensitive = true
 }
+
+resource "azurerm_redis_cache" "redis" {
+  name                = "devops-redis-cache"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  capacity            = 1
+  family              = "C"
+  sku_name            = "Standard"
+  enable_non_ssl_port = false
+  minimum_tls_version = "1.2"
+}
+
+output "redis_primary_connection_string" {
+  value     = azurerm_redis_cache.redis.primary_connection_string
+  sensitive = true
+}

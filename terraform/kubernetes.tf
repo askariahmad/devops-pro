@@ -20,7 +20,8 @@ locals {
   env_vars = [
     { name = "DB_HOST",       value = "http://localhost:4577" },
     { name = "KAFKA_BROKERS", value = "http://localhost:4577" },
-    { name = "AUTH_URL",      value = "http://localhost:4577" }
+    { name = "AUTH_URL",      value = "http://localhost:4577" },
+    { name = "SPRING_DATA_REDIS_HOST", value = azurerm_redis_cache.redis.hostname }
   ]
 }
 

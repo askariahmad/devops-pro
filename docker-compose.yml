@@ -1,13 +1,5 @@
 version: '3.8'
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: devops-redis
-    ports:
-      - 6379:6379
-    command: redis-server --appendonly yes
-    networks:
-      - devops-network
   config-service:
     build:
       context: .
@@ -63,11 +55,9 @@ services:
     ports:
       - 8085:8085
     depends_on:
-      - redis
       - floci
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: floci:4577
-      SPRING_DATA_REDIS_HOST: redis
       SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
       SERVICES_INCIDENT_URL: http://incident-service:8084/api/v1/incidents
     networks:
