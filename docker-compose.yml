@@ -1,82 +1,38 @@
 version: '3.8'
-
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: devops-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-    networks:
-      - devops-network
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: devops-kafka
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      # Dual listeners: INTERNAL for Docker containers, EXTERNAL for host machine
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-    ports:
-      - "9092:9092"
-    networks:
-      - devops-network
-
   redis:
     image: redis:7-alpine
     container_name: devops-redis
     ports:
-      - "6379:6379"
+      - 6379:6379
     command: redis-server --appendonly yes
     networks:
       - devops-network
-
-  mongodb:
-    image: mongo:latest
-    container_name: devops-mongodb
-    ports:
-      - "27018:27017"
-    networks:
-      - devops-network
-
   config-service:
     build:
       context: .
       dockerfile: ./config-service/Dockerfile
     container_name: devops-config-service
     ports:
-      - "8082:8082"
+      - 8082:8082
     depends_on:
-      - mongodb
+      - floci
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_config
+      SPRING_DATA_MONGODB_URI: mongodb://floci:4577/devops_config
     networks:
       - devops-network
-
   gateway-service:
     build:
       context: .
       dockerfile: ./gateway-service/Dockerfile
     container_name: devops-gateway-service
     ports:
-      - "8080:8080"
+      - 8080:8080
     depends_on:
-      - mongodb
       - config-service
+      - floci
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_users
+      SPRING_DATA_MONGODB_URI: mongodb://floci:4577/devops_users
       CONFIG_SERVICE_URL: http://config-service:8082
       COLLECTOR_SERVICE_URL: http://log-collector-service:8083
       ANALYZER_SERVICE_URL: http://log-analyzer-service:8081
@@ -85,102 +41,98 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8086
     networks:
       - devops-network
-
   incident-service:
     build:
       context: .
       dockerfile: ./incident-service/Dockerfile
     container_name: devops-incident-service
     ports:
-      - "8084:8084"
+      - 8084:8084
     depends_on:
-      - kafka
-      - mongodb
+      - floci
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_incidents
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: floci:4577
+      SPRING_DATA_MONGODB_URI: mongodb://floci:4577/devops_incidents
     networks:
       - devops-network
-
   repo-scanner-service:
     build:
       context: .
       dockerfile: ./repo-scanner-service/Dockerfile
     container_name: devops-repo-scanner-service
     ports:
-      - "8085:8085"
+      - 8085:8085
     depends_on:
-      - kafka
       - redis
+      - floci
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: floci:4577
       SPRING_DATA_REDIS_HOST: redis
       SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
       SERVICES_INCIDENT_URL: http://incident-service:8084/api/v1/incidents
     networks:
       - devops-network
-
   log-analyzer-service:
     build:
       context: .
       dockerfile: ./log-analyzer-service/Dockerfile
     container_name: devops-log-analyzer-service
     ports:
-      - "8086:8086"
+      - 8086:8086
     depends_on:
-      - kafka
+      - floci
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: floci:4577
       SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
       SERVICES_INCIDENT_URL: http://incident-service:8084/api/v1/incidents
     networks:
       - devops-network
-
   log-collector-service:
     build:
       context: .
       dockerfile: ./log-collector-service/Dockerfile
     container_name: devops-log-collector-service
     ports:
-      - "8087:8083"
+      - 8087:8083
     depends_on:
-      - kafka
+      - floci
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: floci:4577
       SERVICES_CONFIG_URL: http://config-service:8082/api/v1/config
       SERVICES_ANALYZER_URL: http://log-analyzer-service:8081/api/v1/analyzer/logs
       SPLUNK_MOCK_URL: http://localhost:8083/api/v1/mock/splunk/logs
     networks:
       - devops-network
-
   notification-service:
     build:
       context: .
       dockerfile: ./notification-service/Dockerfile
     container_name: devops-notification-service
     ports:
-      - "8088:8088"
+      - 8088:8088
     depends_on:
-      - mongodb
+      - floci
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/devops_notifications
+      SPRING_DATA_MONGODB_URI: mongodb://floci:4577/devops_notifications
     networks:
       - devops-network
-
   dashboard-ui:
     build:
       context: ./dashboard-ui
     container_name: devops-dashboard-ui
     ports:
-      - "5173:80"
+      - 5173:80
     depends_on:
       - gateway-service
     networks:
       - devops-network
-
+  floci:
+    image: floci/floci-az:latest
+    container_name: floci-az
+    ports:
+      - 4577:4577
+    networks:
+      - devops-network
 networks:
   devops-network:
     driver: bridge
-
-
-
