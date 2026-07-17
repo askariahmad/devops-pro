@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         FLOCI_AZ_SERVICES_AKS_MOCKED = 'true'
+        DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = 'true'
     }
 
     stages {
