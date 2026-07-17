@@ -21,6 +21,49 @@ pipeline {
             }
         }
 
+        stage('Bootstrap Tools') {
+            steps {
+                sh '''
+                    # Check if pwsh is missing
+                    if ! command -v pwsh &> /dev/null; then
+                        echo "Installing PowerShell Core..."
+                        curl -L -o powershell.tar.gz https://github.com/PowerShell/PowerShell/releases/download/v7.4.2/powershell-7.4.2-linux-x64.tar.gz
+                        mkdir -p /opt/microsoft/powershell/7
+                        tar zxf powershell.tar.gz -C /opt/microsoft/powershell/7
+                        chmod +x /opt/microsoft/powershell/7/pwsh
+                        ln -sf /opt/microsoft/powershell/7/pwsh /usr/local/bin/pwsh
+                        rm powershell.tar.gz
+                    fi
+
+                    # Check if terraform is missing
+                    if ! command -v terraform &> /dev/null; then
+                        echo "Installing Terraform..."
+                        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+                        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bookworm main" | tee /etc/apt/sources.list.d/hashicorp.list
+                        apt-get update && apt-get install -y terraform
+                    fi
+
+                    # Check if kubectl is missing
+                    if ! command -v kubectl &> /dev/null; then
+                        echo "Installing kubectl..."
+                        curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+                        chmod +x kubectl
+                        mv kubectl /usr/local/bin/kubectl
+                    fi
+
+                    # Check if npm or mvn are missing
+                    if ! command -v npm &> /dev/null || ! command -v mvn &> /dev/null; then
+                        echo "Installing Node.js, npm, and Maven..."
+                        apt-get update && apt-get install -y nodejs npm maven
+                    fi
+
+                    # Configure Git safe directory & protocols
+                    git config --global --add safe.directory '*'
+                    git config --global protocol.file.allow always
+                '''
+            }
+        }
+
         stage('Verify Prerequisites') {
             steps {
                 sh 'pwsh ./deploy.ps1 -Cloud azure -Stage Verify'
