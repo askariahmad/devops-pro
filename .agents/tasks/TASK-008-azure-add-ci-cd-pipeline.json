@@ -1,0 +1,20 @@
+{
+  "id": "TASK-008",
+  "title": "Add Azure CI/CD workflow for build, test, and deployment",
+  "description": "Create an Azure-focused CI/CD workflow so images can be built, pushed to ACR, and deployed to AKS without manual steps.",
+  "priority": "high",
+  "status": "todo",
+  "branch": "feat/azure-migration",
+  "assignee": "@devops-engineer",
+  "reviewers": ["@architect", "@security-auditor"],
+  "source": "knowledge reference: azure-architecture.md",
+  "acceptanceCriteria": [
+    "A workflow exists for build and test",
+    "Docker images are pushed to the Azure container registry",
+    "The workflow supports deployment to the Azure target environment"
+  ],
+  "notes": [
+    "The researcher notes that no CI/CD pipeline currently exists for Azure.",
+    "The implementation should be documented so the same pattern can later be applied to AWS."
+  ]
+}
