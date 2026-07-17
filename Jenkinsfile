@@ -15,7 +15,7 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM', 
                     branches: [[name: '*/feat/azure-migration']], 
-                    extensions: [[$class: 'SubmoduleOption', recursiveSubmodules: true, disableSubmodules: false, trackingSubmodules: true]], 
+                    extensions: [[$class: 'SubmoduleOption', recursiveSubmodules: true, disableSubmodules: false, trackingSubmodules: false]], 
                     userRemoteConfigs: [[url: 'file:///workspace']]
                 ])
             }
