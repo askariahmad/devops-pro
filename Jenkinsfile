@@ -6,7 +6,21 @@ pipeline {
         DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = 'true'
     }
 
+    options {
+        skipDefaultCheckout()
+    }
+
     stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: '*/feat/azure-migration']], 
+                    extensions: [[$class: 'SubmoduleOption', recursiveSubmodules: true, disableSubmodules: false, trackingSubmodules: true]], 
+                    userRemoteConfigs: [[url: 'file:///workspace']]
+                ])
+            }
+        }
+
         stage('Verify Prerequisites') {
             steps {
                 sh 'pwsh ./deploy.ps1 -Cloud azure -Stage Verify'
