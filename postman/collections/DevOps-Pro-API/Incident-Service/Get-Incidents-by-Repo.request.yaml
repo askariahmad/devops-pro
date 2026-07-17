@@ -1,0 +1,11 @@
+$kind: http-request
+name: Get Incidents by Repo
+method: GET
+url: '{{baseUrl}}/api/v1/incidents/repo'
+order: 4000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+queryParams:
+  - key: repository
+    value: org/repo1

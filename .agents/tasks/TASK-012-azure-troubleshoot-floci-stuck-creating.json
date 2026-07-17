@@ -1,0 +1,29 @@
+{
+  "id": "TASK-012",
+  "title": "Troubleshoot Floci Azure resources stuck in 'Creating' state during deployment",
+  "description": "AKS, ACR, and Redis cache containers are UP and healthy, but stuck in 'Creating' state on the Floci API, causing Terraform to poll indefinitely. Terminal diagnostics are currently blocked due to a system-level permission approval timeout.",
+  "priority": "critical",
+  "status": "in-progress",
+  "branch": "feat/azure-migration",
+  "assignee": "@devops-engineer",
+  "reviewers": ["@architect", "@security-auditor"],
+  "source": "incident report from @devops-engineer",
+  "acceptanceCriteria": [
+    "Identify why Floci API does not transition resource status to 'Succeeded'",
+    "Resolve the provisioning state blocker so Terraform apply finishes successfully",
+    "Acquire diagnostic logs from floci-az container"
+  ],
+  "notes": [
+    "Floci-AZ started successfully on port 4577.",
+    "deploy.ps1 fixed (Docker socket mounted, silent certificate import with certutil fixed).",
+    "Root cause identified: Docker bridge network DNS resolution is disabled, preventing Floci from resolving sub-container hostnames.",
+    "Authorized solution: deploy.ps1 modified to create and use a custom user-defined network (floci-network).",
+    "New blocker encountered: Port collision (ports 6379 and 6443) during rerun because orphaned sub-containers from the first run remain active on the host.",
+    "Proposed solution: Run a Docker command to clean up all orphaned floci-az sub-containers.",
+    "Rerun progress: ACR successfully provisioned in 11 seconds. AKS and Redis containers are Up and initializing.",
+    "AKS status: Currently booting nested K3s control plane and deploying system workloads, while Floci polls port 6443.",
+    "Workflow update: Parent cancelled manual task-277. Deployment engineer instructed to request command execution approval from @manager and run the deploy script themselves.",
+    "TLS blocker: Port exposure race condition caused TLS certificate download to fail silently before Quarkus HTTP server was fully ready, leading to x509 verification error.",
+    "TLS resolution: deploy.ps1 modified to implement a retry loop (up to 15 attempts with 2s sleep) for certificate downloads. Awaiting @manager approval to run the test."
+  ]
+}

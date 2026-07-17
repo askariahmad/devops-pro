@@ -1,0 +1,5 @@
+$kind: http-request
+name: Show Rule
+method: GET
+url: 'http://localhost:8085/api/mock-sonar/api/rules/show'
+order: 2000

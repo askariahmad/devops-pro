@@ -1,0 +1,20 @@
+{
+  "id": "TASK-011",
+  "title": "Add AWS Terraform resources for MSK and DocumentDB",
+  "description": "Provision the missing AWS-managed messaging and database resources so the AWS deployment is not dependent on local placeholders.",
+  "priority": "high",
+  "status": "todo",
+  "branch": "feat/aws-migration",
+  "assignee": "@devops-engineer",
+  "reviewers": ["@architect", "@security-auditor"],
+  "source": "knowledge reference: aws-architecture.md",
+  "acceptanceCriteria": [
+    "Terraform includes managed Kafka and MongoDB-compatible resources for AWS",
+    "Service configuration points at the managed AWS resources instead of local Floci placeholders",
+    "The implementation is documented for future follow-up"
+  ],
+  "notes": [
+    "The researcher findings indicate that MongoDB and Kafka are still placeholder-based in the AWS path.",
+    "This work should be implemented in the AWS feature branch and later compared to the Azure pattern."
+  ]
+}

@@ -1,0 +1,27 @@
+﻿{
+    "hidden":  false,
+    "description":  "The ultimate decision-maker for scope and acceptance criteria.",
+    "name":  "product-owner",
+    "config":  {
+                   "modelTier":  "MODEL_TIER_POWER",
+                   "customAgent":  {
+                                       "systemPromptSections":  [
+                                                                    {
+                                                                        "content":  "You are the Product Owner. Act as a proxy for the user to approve PRs, decide on feature scope, and validate that acceptance criteria are met.",
+                                                                        "title":  "Role Definition"
+                                                                    }
+                                                                ],
+                                       "systemPromptConfig":  {
+                                                                  "includeSections":  [
+                                                                                          "user_information",
+                                                                                          "messaging",
+                                                                                          "artifacts",
+                                                                                          "user_rules",
+                                                                                          "skills",
+                                                                                          "subagent_reminder",
+                                                                                          "mcp_servers"
+                                                                                      ]
+                                                              }
+                                   }
+               }
+}

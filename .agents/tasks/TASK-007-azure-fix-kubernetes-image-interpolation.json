@@ -1,0 +1,20 @@
+{
+  "id": "TASK-007",
+  "title": "Fix Azure Kubernetes image interpolation for ACR pulls",
+  "description": "Correct the Kubernetes image reference in terraform/kubernetes.tf so Azure container images resolve correctly from ACR instead of using a literal string.",
+  "priority": "high",
+  "status": "todo",
+  "branch": "feat/azure-migration",
+  "assignee": "@devops-engineer",
+  "reviewers": ["@architect", "@security-auditor"],
+  "source": "knowledge reference: azure-architecture.md",
+  "acceptanceCriteria": [
+    "Terraform uses HCL interpolation for the image name in the Kubernetes deployment manifests",
+    "The Azure deployment path renders the expected image reference pattern for each service",
+    "The change is documented in the Azure implementation notes"
+  ],
+  "notes": [
+    "The researcher findings flagged a literal \"{each.key}\" image reference bug.",
+    "This work should be completed in an Azure feature branch and documented for later AWS reuse."
+  ]
+}

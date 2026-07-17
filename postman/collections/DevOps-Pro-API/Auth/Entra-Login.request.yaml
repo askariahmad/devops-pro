@@ -1,0 +1,15 @@
+$kind: http-request
+name: Entra Login
+method: POST
+url: '{{baseUrl}}/api/v1/auth/entra-login'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "entraToken": "msal-token-here",
+      "username": "dev@company.com"
+    }

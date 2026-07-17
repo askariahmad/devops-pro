@@ -1,0 +1,7 @@
+$kind: collection
+name: DevOps Pro API
+variables:
+  - key: baseUrl
+    value: 'http://localhost:8080'
+  - key: tenantId
+    value: test-tenant

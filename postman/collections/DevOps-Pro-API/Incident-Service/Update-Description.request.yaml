@@ -1,0 +1,20 @@
+$kind: http-request
+name: Update Description
+method: PUT
+url: '{{baseUrl}}/api/v1/incidents/:id/description'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{incidentId}}'
+body:
+  type: json
+  content: |-
+    {
+      "why": "Updated root cause",
+      "howToFix": "Updated fix instructions"
+    }

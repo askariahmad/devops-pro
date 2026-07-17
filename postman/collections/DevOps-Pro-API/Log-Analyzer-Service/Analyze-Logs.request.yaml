@@ -1,0 +1,17 @@
+$kind: http-request
+name: Analyze Logs
+method: POST
+url: '{{baseUrl}}/api/v1/analyzer/logs'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+body:
+  type: json
+  content: |-
+    [
+      "ERROR 2024-01-01 NullPointerException at com.app.Service:42",
+      "WARN 2024-01-01 Connection timeout"
+    ]

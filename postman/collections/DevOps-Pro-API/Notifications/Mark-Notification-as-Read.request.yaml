@@ -1,0 +1,11 @@
+$kind: http-request
+name: Mark Notification as Read
+method: PATCH
+url: '{{baseUrl}}/api/v1/notifications/:id/read'
+order: 4000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{notificationId}}'

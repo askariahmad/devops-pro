@@ -1,0 +1,33 @@
+$kind: http-request
+name: Test Connection
+method: POST
+url: '{{baseUrl}}/api/v1/config/test-connection/:provider'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: provider
+    value: splunk
+queryParams:
+  - key: mock
+    value: 'true'
+body:
+  type: json
+  content: |-
+    {
+      "jiraUrl": "https://yourorg.atlassian.net",
+      "jiraEmail": "user@example.com",
+      "jiraToken": "your-jira-token",
+      "jiraProjectKey": "DEV",
+      "sonarUrl": "https://sonarcloud.io",
+      "sonarToken": "your-sonar-token",
+      "splunkUrl": "https://splunk.example.com",
+      "splunkToken": "your-splunk-token",
+      "githubToken": "ghp_yourtoken",
+      "githubRepositories": ["org/repo1", "org/repo2"],
+      "activeLlmProvider": "OPENAI",
+      "llmConfigs": [{ "provider": "OPENAI", "apiKey": "sk-...", "active": true }]
+    }

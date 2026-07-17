@@ -1,0 +1,37 @@
+# IDE and editor files
+.idea/
+*.iml
+.vscode/
+
+# Postman collections and environment files
+.postman/
+
+# Floci Azure emulator certificate (local only)
+floci-az.pem
+
+# Graphify knowledge graph output
+graphify-out/
+
+# Jenkins configuration (if not part of CI code)
+jenkins/
+
+# Terraform files that should not be versioned
+.terraform/
+.terraform.lock.h5
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+
+# UI environment files (development/production)
+/dashboard-ui/.env*
+
+# Large diff or temporary files in UI
+/dashboard-ui/diff.txt
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# OS generated files
+Thumbs.db
+.DS_Store

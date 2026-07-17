@@ -1,0 +1,20 @@
+{
+  "id": "TASK-009",
+  "title": "Harden Azure Entra authentication validation in the gateway",
+  "description": "Strengthen the Azure authentication flow so Entra tokens are validated more securely instead of being accepted on trust alone.",
+  "priority": "high",
+  "status": "todo",
+  "branch": "feat/azure-migration",
+  "assignee": "@backend-developer",
+  "reviewers": ["@architect", "@security-auditor"],
+  "source": "knowledge reference: azure-architecture.md",
+  "acceptanceCriteria": [
+    "The gateway validates the Azure identity token according to the expected security model",
+    "The implementation preserves the existing login flow and tenant derivation behavior",
+    "The change is covered by tests or validation steps"
+  ],
+  "notes": [
+    "The researcher identified that the current backend does not cryptographically validate the Entra token.",
+    "This is a production-hardening task and should be prioritized after the core deployment path is stable."
+  ]
+}

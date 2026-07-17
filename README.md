@@ -19,8 +19,9 @@ By leveraging Large Language Models (LLMs) via **LangChain4j**, Apache Kafka for
 5. [Service & Sub-Module Catalog](#service--sub-module-catalog)
 6. [Data Persistence & Streaming](#data-persistence--streaming)
 7. [Getting Started & Local Setup](#getting-started--local-setup)
-8. [Multi-Tenancy Details](#multi-tenancy-details)
-9. [Troubleshooting & FAQs](#troubleshooting--faqs)
+8. [Azure Deployment](#azure-deployment)
+9. [Multi-Tenancy Details](#multi-tenancy-details)
+10. [Troubleshooting & FAQs](#troubleshooting--faqs)
 
 ---
 
@@ -40,13 +41,54 @@ By leveraging Large Language Models (LLMs) via **LangChain4j**, Apache Kafka for
 - **Databases**: MongoDB (Document Store), Redis (Distributed Caching)
 - **AI & Integrations**: LangChain4j, Ollama, OpenAI, Anthropic Claude, SonarCloud, GitHub API
 - **Frontend**: React 18, Vite, Tailwind CSS, Axios
-- **Infrastructure**: Docker, Docker Compose
+- **Infrastructure**: Docker, Docker Compose, Kubernetes, Azure AKS
 
 ---
 
 ## 🗺️ High-Level Architecture (HLD)
 
 The entire ecosystem communicates asynchronously to ensure extreme resilience under high-volume log ingestion and code scanning loads.
+
+## 🌐 Azure Deployment
+
+This platform supports both local development with Floci-AZ emulators and production deployment to Azure. The architecture is designed with an Azure-first approach to ensure production-grade reliability and scalability while maintaining the flexibility for local development and testing. The deployment strategy includes:
+
+### Local Development with Floci-AZ
+- Uses Floci-AZ emulator for local Azure service simulation
+- Supports all Azure services locally without requiring Azure credentials
+- Enables rapid development and testing cycles
+- Maintains identical configuration between local and production environments
+
+### Production Deployment to Azure
+- Deploys to Azure Kubernetes Service (AKS) for production environments
+- Utilizes Azure Cosmos DB for data persistence
+- Implements Azure Cache for Redis for distributed caching
+- Integrates with Azure Key Vault for secrets management
+- Leverages Azure Monitor and Application Insights for comprehensive monitoring
+- Implements Azure AD authentication for enterprise security
+
+### Deployment Process
+1. Local development with `.\deploy.ps1 azure` command
+2. Automated deployment to Azure using Terraform infrastructure as code
+3. CI/CD pipelines for continuous delivery to Azure environments
+4. Seamless transition between local development and production deployment
+
+## Getting Started & Local Setup
+
+### Prerequisites
+- Docker Desktop installed and running
+- PowerShell 5.1 or higher
+- Git
+
+### Local Development Setup
+1. Clone the repository
+2. Run `.\deploy.ps1 azure` to start local development with Floci-AZ emulators
+3. All services will be available at `http://localhost`
+
+### Production Deployment
+1. Configure Azure credentials and subscription details
+2. Run `terraform init` and `terraform apply` in the `terraform` directory
+3. Services will be deployed to Azure AKS cluster with proper monitoring and security configurations
 
 ```mermaid
 graph TD

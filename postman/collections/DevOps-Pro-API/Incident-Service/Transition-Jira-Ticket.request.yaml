@@ -1,0 +1,20 @@
+$kind: http-request
+name: Transition Jira Ticket
+method: POST
+url: '{{baseUrl}}/api/v1/incidents/:id/jira/transitions'
+order: 11000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{incidentId}}'
+body:
+  type: json
+  content: |-
+    {
+      "transitionId": "31",
+      "transitionName": "In Progress"
+    }

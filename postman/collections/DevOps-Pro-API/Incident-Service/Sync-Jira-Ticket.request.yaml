@@ -1,0 +1,11 @@
+$kind: http-request
+name: Sync Jira Ticket
+method: POST
+url: '{{baseUrl}}/api/v1/incidents/:id/jira/sync'
+order: 8000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{incidentId}}'

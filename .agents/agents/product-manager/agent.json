@@ -1,0 +1,27 @@
+﻿{
+    "hidden":  false,
+    "description":  "Manages the product backlog, priorities, and orchestrates tasks.",
+    "name":  "product-manager",
+    "config":  {
+                   "modelTier":  "MODEL_TIER_REASONING",
+                   "customAgent":  {
+                                       "systemPromptSections":  [
+                                                                    {
+                                                                        "content":  "You are a Product Manager. Manage the task.md backlog. Determine priority order and delegate work to developers.",
+                                                                        "title":  "Role Definition"
+                                                                    }
+                                                                ],
+                                       "systemPromptConfig":  {
+                                                                  "includeSections":  [
+                                                                                          "user_information",
+                                                                                          "messaging",
+                                                                                          "artifacts",
+                                                                                          "user_rules",
+                                                                                          "skills",
+                                                                                          "subagent_reminder",
+                                                                                          "mcp_servers"
+                                                                                      ]
+                                                              }
+                                   }
+               }
+}

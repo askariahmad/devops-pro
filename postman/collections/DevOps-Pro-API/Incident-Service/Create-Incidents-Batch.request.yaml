@@ -1,0 +1,22 @@
+$kind: http-request
+name: Create Incidents Batch
+method: POST
+url: '{{baseUrl}}/api/v1/incidents/batch'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+body:
+  type: json
+  content: |-
+    [
+      {
+        "title": "SQL Injection vulnerability detected",
+        "severity": "HIGH",
+        "repository": "org/repo1",
+        "why": "Unsanitized user input passed to SQL query",
+        "howToFix": "Use parameterized queries"
+      }
+    ]

@@ -1,0 +1,20 @@
+{
+  "id": "TASK-010",
+  "title": "Document Azure implementation patterns for later AWS replication",
+  "description": "Capture the Azure implementation decisions, deployment steps, and operational notes in a reusable format so the AWS team can follow the same approach.",
+  "priority": "medium",
+  "status": "todo",
+  "branch": "feat/azure-migration",
+  "assignee": "@documentation-engineer",
+  "reviewers": ["@architect", "@product-manager"],
+  "source": "knowledge reference: azure-architecture.md",
+  "acceptanceCriteria": [
+    "A written Azure implementation guide exists",
+    "The document includes deployment, configuration, validation, and rollback notes",
+    "The document clearly marks which steps are reusable for AWS"
+  ],
+  "notes": [
+    "This task is required by the team operating rules to keep Azure work reproducible for AWS.",
+    "The documentation should be updated as the implementation work progresses."
+  ]
+}
