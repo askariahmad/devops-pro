@@ -38,6 +38,7 @@
 
 ### 2. Azure Account & CLI Setup
 
+#### Option A: Using Azure CLI
 ```powershell
 # Log in with your Azure student account
 az login
@@ -51,10 +52,24 @@ az provider register --namespace Microsoft.Web
 az provider register --namespace Microsoft.Network
 ```
 
+#### Option B: Using Azure Portal (UI)
+1. **Log in to Azure Portal**: Go to [portal.azure.com](https://portal.azure.com) and log in with your Azure account.
+2. **Set Default Subscription (Optional)**:
+   - In the top right, click your profile picture → **Switch directory** (if needed)
+   - To confirm your active subscription, search for "Subscriptions" in the top search bar
+3. **Register Resource Providers**:
+   - Search for "Subscriptions" → select your subscription
+   - In the left menu, under **Settings**, click **Resource providers**
+   - Search for `Microsoft.ContainerService`, select it, click **Register**
+   - Search for `Microsoft.Web`, select it, click **Register**
+   - Search for `Microsoft.Network`, select it, click **Register**
+   - Wait for registration status to show **Registered** (can take a few minutes)
+
 ---
 
 ### 3. Entra ID (Azure AD) Application Registration
 
+#### Option A: Using Azure CLI
 1. **Create a tenant‑wide app for the UI** (SPA)
 
    ```powershell
@@ -119,19 +134,79 @@ az provider register --namespace Microsoft.Network
        --scope "api.read"
    ```
 
+---
+
+#### Option B: Using Azure Portal (UI)
+1. **Create the UI App Registration (SPA)**
+   - Search for "App registrations" in the Azure portal → click **New registration**
+   - **Name**: `devops-pro-ui`
+   - **Supported account types**: Choose based on your needs (single-tenant, multi-tenant, or multi-tenant + personal accounts)
+   - **Redirect URI**:
+     - Dropdown: Select **Single-page application (SPA)**
+     - URL: Enter `https://<YOUR_DOMAIN>/auth/callback`
+   - Click **Register**
+   - On the **Overview** page, copy the **Application (client) ID** and save it as `$uiClientId`
+
+2. **Create the API App Registration**
+   - Go back to "App registrations" → click **New registration**
+   - **Name**: `devops-pro-api`
+   - **Supported account types**: Choose the same option as your UI app
+   - **Redirect URI**:
+     - Dropdown: Select **Web**
+     - URL: Enter `https://<YOUR_DOMAIN>/swagger-ui/oauth2-redirect.html`
+   - Click **Register**
+   - On the **Overview** page, copy the **Application (client) ID** and save it as `$apiClientId`
+
+3. **Create a Client Secret for the API App**
+   - Open the `devops-pro-api` app registration
+   - In the left menu, click **Certificates & secrets**
+   - Click **New client secret**
+   - Enter a description like `devops-pro-api-secret`
+   - Choose an expiration (e.g., 24 months)
+   - Click **Add**
+   - Immediately copy the **Value** (not the Secret ID) and save it as `$apiClientSecret` – you won't be able to see it again!
+
+4. **Expose an API Scope on the API App**
+   - Open the `devops-pro-api` app registration
+   - In the left menu, click **Expose an API**
+   - Next to "Application ID URI", click **Set** → accept the default URI (or customize) → click **Save**
+   - Click **Add a scope**
+     - **Scope name**: `api.read`
+     - **Who can consent**: Admins and users
+     - **Admin consent display name**: `DevOps-Pro API`
+     - **Admin consent description**: `Full access to DevOps-Pro API`
+     - **User consent display name**: `DevOps-Pro API`
+     - **User consent description**: `Allow the app to call DevOps-Pro API`
+     - **State**: Enabled
+   - Click **Add scope**
+
+5. **Add API Permissions to the UI App**
+   - Open the `devops-pro-ui` app registration
+   - In the left menu, click **API permissions** → **Add a permission**
+   - Select **My APIs** → choose `devops-pro-api`
+   - Select **Delegated permissions** → check the `api.read` scope
+   - Click **Add permissions**
+
+6. **Grant Admin Consent**
+   - Still on the UI app's **API permissions** page
+   - Click **Grant admin consent for Default Directory** → click **Yes** to confirm
+
 > **Store** `$uiClientId`, `$apiClientId` and `$apiClientSecret` – you will need them for the UI config and backend secrets.  
 
 ---
 
 ### 4. Container Registry (ACR) & Image Build
 
+#### Option A: Using Azure CLI
 1. **Create an ACR instance**
+   - **Note about Azure region policies**: Your subscription may have an Azure Policy that restricts which regions you can deploy to! To find allowed regions, go to the Azure portal → search for "Policy" → check "Assignments"!
 
    ```powershell
    az acr create --resource-group devops-pro-rg `
        --name devopsproacr `
        --sku Basic `
-       --admin-enabled true
+       --admin-enabled true `
+       --location <allowed-region>  # Replace with an allowed region from your Azure Policy!
    ```
 
 2. **Login to ACR**
@@ -157,6 +232,64 @@ az provider register --namespace Microsoft.Network
    cd dashboard-ui
    npm ci
    npm run build   # Vite builds to /dist
+   docker build -t devopsproacr.azurecr.io/dashboard-ui:latest .
+   docker push devopsproacr.azurecr.io/dashboard-ui:latest
+   cd ..
+   ```
+
+---
+
+#### Option B: Using Azure Portal (UI) + CLI for image builds
+1. **Create a Resource Group (if not exists)**:
+   - **Note about Azure region policies**: Your subscription may have an Azure Policy that restricts which regions you can deploy to! To find allowed regions, go to the Azure portal → search for "Policy" → check "Assignments"!
+   - **Note about resource group location**: You can't change the location of an existing resource group! If you created it in the wrong region, delete it and create a new one in the allowed region!
+   - Search for "Resource groups" → click **Create**
+   - **Resource group name**: `devops-pro-rg`
+   - **Region**: Choose an **allowed region** (check your Azure Policy first)
+   - Click **Review + create** → **Create**
+
+2. **Create an ACR instance**:
+   - Search for "Container registries" → click **Create**
+   - **Basics Tab**:
+     - **Subscription**: Select your subscription
+     - **Resource group**: Select `devops-pro-rg`
+     - **Registry name**: Enter a unique name (e.g., `devopsproacr`; must be 5-50 characters, lowercase letters/numbers)
+     - **Location**: Choose an **allowed region** (same as your resource group, check your Azure Policy first)
+     - **Pricing plan**: Basic (dev/test), Standard (production), or Premium (advanced features like geo-replication, availability zones)
+     - **Domain name label scope**: Choose **No reuse** (recommended—your registry name/DNS label is globally unique and can't be used by anyone else)
+     - **Availability zones** (only if Premium SKU is selected): Enable to make your registry zone-redundant (available in regions with AZ support)
+   - **Encryption Tab** (optional): Leave as default (Microsoft-managed keys)
+   - **Networking Tab** (optional): Leave as default (Public access)
+   - **Advanced Tab**:
+     - **Admin user**: Enable (for `az acr login` with username/password; for production, use managed identities instead)
+     - **Role assignment permissions mode**: Choose either:
+       - **RBAC Registry Permissions** (default/recommended): Only Azure RBAC applies to the entire registry (simpler, good for basic deployments)
+       - **RBAC Registry + ABAC Repository Permissions**: Use both Azure RBAC and ABAC for granular repository-level permissions (good for complex scenarios with multiple teams/repos)
+   - **Tags Tab** (optional): Add tags to organize your resources (key-value pairs)
+     - Example tags:
+       - `Environment`: `Production`
+       - `Project`: `DevOps-Pro`
+       - `Department`: `Engineering`
+   - Click **Review + create** → **Create**
+
+3. **Login to ACR (CLI required)**:
+   ```powershell
+   az acr login --name devopsproacr
+   ```
+
+4. **Build & push images (same as CLI option, steps 3-4)**:
+   ```powershell
+   # Example for gateway-service (repeat for each microservice)
+   cd gateway-service
+   mvn clean package -DskipTests
+   docker build -t devopsproacr.azurecr.io/gateway-service:latest .
+   docker push devopsproacr.azurecr.io/gateway-service:latest
+   cd ..
+
+   # Build & push UI
+   cd dashboard-ui
+   npm ci
+   npm run build
    docker build -t devopsproacr.azurecr.io/dashboard-ui:latest .
    docker push devopsproacr.azurecr.io/dashboard-ui:latest
    cd ..
@@ -262,6 +395,7 @@ Two production‑grade options:
 
 #### 7.1 Azure Static Web Apps (recommended)
 
+##### Option A: Using Azure CLI
 ```powershell
 az staticwebapp create `
     --name devops-pro-ui `
@@ -275,7 +409,22 @@ az staticwebapp create `
     --login-with-github   # if you prefer GitHub auth for CI
 ```
 
-> **Configuration** – In the portal, go to **Configuration > Application Settings** and add:
+##### Option B: Using Azure Portal (UI)
+1. **Create a Static Web App**:
+   - Search for "Static Web Apps" in the Azure portal → click **Create**
+   - **Subscription**: Select your subscription
+   - **Resource group**: Select `devops-pro-rg`
+   - **Name**: Enter `devops-pro-ui`
+   - **Plan type**: Standard
+   - **Region for Azure Functions API and staging environments**: Choose a region (e.g., East US)
+   - **Source**: Select **Other** (for manual deployment) or **GitHub** (for CI/CD)
+     - If GitHub: Sign in, select your repository, branch, app location (`dashboard-ui`), output location (`dist`)
+   - Click **Review + create** → **Create**
+
+2. **Configure Environment Variables**:
+   - After deployment completes, go to the Static Web App resource
+   - In the left menu, under **Settings**, click **Configuration**
+   - Click **Add** and add the following application settings:
 
 | Name | Value |
 |------|-------|
@@ -283,6 +432,8 @@ az staticwebapp create `
 | `REACT_APP_TENANT_ID` | `<AZURE_TENANT_ID>` |
 | `REACT_APP_AUTHORITY` | `https://login.microsoftonline.com/<AZURE_TENANT_ID>` |
 | `REACT_APP_REDIRECT_URI` | `https://<YOUR_DOMAIN>/auth/callback` |
+
+   - Click **Save** to apply changes
 
 #### 7.2 AKS‑based Deployment (alternative)
 
