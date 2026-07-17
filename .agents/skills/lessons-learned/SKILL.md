@@ -53,5 +53,22 @@ In local Kubernetes environments (e.g., Kind or Docker Desktop), exposing multip
 Using standard `/actuator/health` health checks in Kubernetes service/deployment readiness and liveness probes requires the `spring-boot-starter-actuator` library. Without it, the application starts successfully but HTTP probes fail with `404 Not Found` errors, placing pods in a permanent `CrashLoopBackOff` restart cycle.
 * **Resolution**: Ensure the `spring-boot-starter-actuator` dependency is declared in the root parent `pom.xml` so all microservices inherit it.
 
+## 9. Debian Trixie (Pre-Release) Package and PGP Failures
+Debian trixie images (used by default in some LTS base images) lack populated third-party repositories and block PGP v3 signatures (throwing `sqv returned error code (1) Policy rejected packet type`).
+* **Resolution**: For Terraform, force the repository to target stable `bookworm` instead of using `$(lsb_release -cs)`. For `kubectl`, download the compiled binary directly via `curl` to bypass apt and PGP checks.
+
+## 10. PowerShell Core Globalization Crash inside Containers
+In minimal Linux containers (like Debian trixie/slim), running PowerShell Core (`pwsh`) will fail on startup if the host container lacks `libicu` globalization libraries.
+* **Resolution**: Set the environment variable `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true` in the container or the pipeline configuration block to enable globalization-invariant execution.
+
+## 11. Jenkins Local Git Checkout Restrictions
+Jenkins Git plugin blocks checkouts from local `file://` paths by default for security.
+* **Resolution**: Inject `-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true` into the Jenkins container's `JAVA_OPTS` on startup.
+
+## 12. Container Kubeconfig Host Bridging
+When running `kubectl` inside a containerized Jenkins to interact with a local Kubernetes cluster, using a host-copied kubeconfig fails because it targets loopback address `127.0.0.1`.
+* **Resolution**: Replace `127.0.0.1` with `host.docker.internal` in the container's kubeconfig (`~/.kube/config`) and add `insecure-skip-tls-verify: true` to bypass certificate SAN restrictions.
+
+
 
 
