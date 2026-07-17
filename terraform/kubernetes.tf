@@ -1,10 +1,5 @@
 provider "kubernetes" {
-  config_path = var.create_cosmos_and_keyvault ? null : "~/.kube/config"
-
-  host                   = var.create_cosmos_and_keyvault ? (var.create_azure_infra ? azurerm_kubernetes_cluster.aks[0].kube_config.0.host : null) : null
-  client_certificate     = var.create_cosmos_and_keyvault ? (var.create_azure_infra ? base64decode(azurerm_kubernetes_cluster.aks[0].kube_config.0.client_certificate) : null) : null
-  client_key             = var.create_cosmos_and_keyvault ? (var.create_azure_infra ? base64decode(azurerm_kubernetes_cluster.aks[0].kube_config.0.client_key) : null) : null
-  cluster_ca_certificate = var.create_cosmos_and_keyvault ? (var.create_azure_infra ? base64decode(azurerm_kubernetes_cluster.aks[0].kube_config.0.cluster_ca_certificate) : null) : null
+  config_path = "~/.kube/config"
 }
 
 locals {
@@ -44,15 +39,15 @@ locals {
   # Environment variables for Azure production
   env_vars_azure = [
     { name = "SPRING_DATA_MONGODB_URI", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_cosmosdb_account.cosmosdb[0].primary_mongodb_connection_string : "mongodb://host.docker.internal:27017" },
-    { name = "SPRING_DATA_REDIS_HOST", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_redis_cache.redis[0].hostname : "host.docker.internal" },
-    { name = "SPRING_DATA_REDIS_PORT", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "6380" : "6379" },
+    { name = "SPRING_DATA_REDIS_HOST", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].hostname : "host.docker.internal" },
+    { name = "SPRING_DATA_REDIS_PORT", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "10000" : "6379" },
     { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "true" : "false" },
-    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_redis_cache.redis[0].primary_access_key : "" },
+    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].default_database[0].primary_access_key : "" },
     { name = "KAFKA_BROKERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "AUTH_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "https://devops-pro-${var.environment}-aks.azure.com" : "http://host.docker.internal:4577" },
-    { name = "AZURE_KEY_VAULT_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_key_vault.keyvault[0].vault_uri : "" },
-    { name = "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY", value = var.create_azure_infra ? "your-instrumentation-key-here" : "" }
+    { name = "AZURE_KEY_VAULT_URL", value = "" },
+    { name = "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY", value = "" }
   ]
 
   # Environment variables for local development with Floci
@@ -138,13 +133,13 @@ resource "kubernetes_deployment_v1" "services" {
       spec {
         container {
           name  = each.key
-          image = "devopspro${var.environment}acr.azurecr.io/${each.key}:latest"
+          image = "${azurerm_container_registry.acr.login_server}/${each.key}:latest"
 
-          # Resource limits for production
+          # Resource limits adjusted for single-node cluster resource constraints
           resources {
             requests = {
-              memory = "512Mi"
-              cpu    = "250m"
+              memory = "256Mi"
+              cpu    = "50m"
             }
             limits = {
               memory = "1Gi"
@@ -158,7 +153,7 @@ resource "kubernetes_deployment_v1" "services" {
               path = each.key == "dashboard-ui" ? "/" : "/actuator/health"
               port = local.service_ports[each.key]
             }
-            initial_delay_seconds = 30
+            initial_delay_seconds = 90
             period_seconds        = 10
           }
 

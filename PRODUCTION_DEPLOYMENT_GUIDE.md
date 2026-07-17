@@ -6,8 +6,8 @@
 1. [Prerequisites](#prerequisites)
 2. [Azure Account & CLI Setup](#azure-account--cli-setup)
 3. [Entra ID (Azure AD) Application Registration](#entra-id-application-registration)
-4. [Container Registry (ACR) & Image Build](#container-registry-acr--image-build)
-5. [Infrastructure as Code – Terraform](#infrastructure-as-code‑terraform)
+4.[Infrastructure as Code – Terraform](#infrastructure-as-code‑terraform)
+5. [Container Registry (ACR) & Image Build](#container-registry-acr--image-build)
 6. [Deploy Backend Microservices to AKS](#deploy-backend-to-aks)
 7. [Deploy Front‑end (React + Vite) to Azure Static Web Apps](#deploy-frontend)
 8. [Configure Secrets & Environment Variables](#configure‑secrets‑environment)
@@ -47,9 +47,11 @@ az login
 az account set --subscription <SUB_ID>
 
 # Verify you have the required resource providers registered
-az provider register --namespace Microsoft.ContainerService
-az provider register --namespace Microsoft.Web
-az provider register --namespace Microsoft.Network
+az provider register --namespace Microsoft.ContainerService  # For AKS
+az provider register --namespace Microsoft.ContainerRegistry # For ACR
+az provider register --namespace Microsoft.Cache            # For Redis Cache
+az provider register --namespace Microsoft.Web             # For Static Web Apps
+az provider register --namespace Microsoft.Network          # For networking resources
 ```
 
 #### Option B: Using Azure Portal (UI)
@@ -195,199 +197,179 @@ az provider register --namespace Microsoft.Network
 
 ---
 
-### 4. Container Registry (ACR) & Image Build
+This project uses Terraform to provision all Azure resources (resource group, ACR, AKS, and Managed Redis). All infrastructure is defined as code in the `/terraform` directory.
 
-#### Option A: Using Azure CLI
-1. **Create an ACR instance**
-   - **Note about Azure region policies**: Your subscription may have an Azure Policy that restricts which regions you can deploy to! To find allowed regions, go to the Azure portal → search for "Policy" → check "Assignments"!
+#### What Terraform Creates for Production
+Terraform provisions these **key Azure resources** for production deployments:
 
-   ```powershell
-   az acr create --resource-group devops-pro-rg `
-       --name devopsproacr `
-       --sku Basic `
-       --admin-enabled true `
-       --location <allowed-region>  # Replace with an allowed region from your Azure Policy!
-   ```
+| Resource | Purpose | Configuration Details |
+|----------|---------|-----------------------|
+| **Resource Group** | Logical container for all resources | Named `${var.project_name}-rg` in your chosen region |
+| **AKS Cluster** | Hosts all backend microservices | `${var.project_name}-aks` with standard node pool (2 nodes by default, Standard_D2s_v3) |
+| **ACR** | Container registry for all microservice/UI images | `${var.project_name}acr` with Standard SKU, admin user enabled, automatically attached to AKS |
+| **Azure Managed Redis** | In-memory caching for session state and data | `${var.project_name}-redis` Balanced_B3 SKU, default database on port 10000 |
+| **Kubernetes Resources** | Prepares your AKS cluster for application deployment | Creates a dedicated `devopspro` namespace and Redis connection secrets in `kubernetes.tf` |
 
-2. **Login to ACR**
+#### Terraform Configuration Files
+The following files are included:
+- `main.tf`: Core Azure resources and provider configuration
+- `variables.tf`: Configurable variables with sensible defaults
+- `kubernetes.tf`: Kubernetes provider setup and namespace/secrets creation
+- `.gitignore`: Terraform-specific ignores for state files and sensitive data
+- `terraform.tfvars.template`: Template for your configuration values
 
-   ```powershell
-   az acr login --name devopsproacr
-   ```
+#### Prerequisites
+- Terraform 1.0+ installed locally
+- Azure CLI authenticated with `az login`
+- A dedicated service principal for Terraform authentication
 
-3. **Build & push backend images** (run from the repo root)
+#### 1. Create a Service Principal for Terraform
+First, create a service principal that Terraform will use to deploy resources:
+```powershell
+$sp = az ad sp create-for-rbac --name "devops-pro-terraform-sp" --role "Contributor" --scopes "/subscriptions/$(az account show --query id -o tsv)"
+$azure_client_id = $sp.appId
+$azure_client_secret = $sp.password
+$azure_tenant_id = $sp.tenant
+$azure_subscription_id = az account show --query id -o tsv
+```
 
-   ```powershell
-   # Example for gateway-service (repeat for each microservice)
-   cd gateway-service
-   mvn clean package -DskipTests
-   docker build -t devopsproacr.azurecr.io/gateway-service:latest .
-   docker push devopsproacr.azurecr.io/gateway-service:latest
-   cd ..
-   ```
-
-4. **Build & push the UI image**
-
-   ```powershell
-   cd dashboard-ui
-   npm ci
-   npm run build   # Vite builds to /dist
-   docker build -t devopsproacr.azurecr.io/dashboard-ui:latest .
-   docker push devopsproacr.azurecr.io/dashboard-ui:latest
-   cd ..
-   ```
-
----
-
-#### Option B: Using Azure Portal (UI) + CLI for image builds
-1. **Create a Resource Group (if not exists)**:
-   - **Note about Azure region policies**: Your subscription may have an Azure Policy that restricts which regions you can deploy to! To find allowed regions, go to the Azure portal → search for "Policy" → check "Assignments"!
-   - **Note about resource group location**: You can't change the location of an existing resource group! If you created it in the wrong region, delete it and create a new one in the allowed region!
-   - Search for "Resource groups" → click **Create**
-   - **Resource group name**: `devops-pro-rg`
-   - **Region**: Choose an **allowed region** (check your Azure Policy first)
-   - Click **Review + create** → **Create**
-
-2. **Create an ACR instance**:
-   - Search for "Container registries" → click **Create**
-   - **Basics Tab**:
-     - **Subscription**: Select your subscription
-     - **Resource group**: Select `devops-pro-rg`
-     - **Registry name**: Enter a unique name (e.g., `devopsproacr`; must be 5-50 characters, lowercase letters/numbers)
-     - **Location**: Choose an **allowed region** (same as your resource group, check your Azure Policy first)
-     - **Pricing plan**: Basic (dev/test), Standard (production), or Premium (advanced features like geo-replication, availability zones)
-     - **Domain name label scope**: Choose **No reuse** (recommended—your registry name/DNS label is globally unique and can't be used by anyone else)
-     - **Availability zones** (only if Premium SKU is selected): Enable to make your registry zone-redundant (available in regions with AZ support)
-   - **Encryption Tab** (optional): Leave as default (Microsoft-managed keys)
-   - **Networking Tab** (optional): Leave as default (Public access)
-   - **Advanced Tab**:
-     - **Admin user**: Enable (for `az acr login` with username/password; for production, use managed identities instead)
-     - **Role assignment permissions mode**: Choose either:
-       - **RBAC Registry Permissions** (default/recommended): Only Azure RBAC applies to the entire registry (simpler, good for basic deployments)
-       - **RBAC Registry + ABAC Repository Permissions**: Use both Azure RBAC and ABAC for granular repository-level permissions (good for complex scenarios with multiple teams/repos)
-   - **Tags Tab** (optional): Add tags to organize your resources (key-value pairs)
-     - Example tags:
-       - `Environment`: `Production`
-       - `Project`: `DevOps-Pro`
-       - `Department`: `Engineering`
-   - Click **Review + create** → **Create**
-
-3. **Login to ACR (CLI required)**:
-   ```powershell
-   az acr login --name devopsproacr
-   ```
-
-4. **Build & push images (same as CLI option, steps 3-4)**:
-   ```powershell
-   # Example for gateway-service (repeat for each microservice)
-   cd gateway-service
-   mvn clean package -DskipTests
-   docker build -t devopsproacr.azurecr.io/gateway-service:latest .
-   docker push devopsproacr.azurecr.io/gateway-service:latest
-   cd ..
-
-   # Build & push UI
-   cd dashboard-ui
-   npm ci
-   npm run build
-   docker build -t devopsproacr.azurecr.io/dashboard-ui:latest .
-   docker push devopsproacr.azurecr.io/dashboard-ui:latest
-   cd ..
-   ```
-
----
-
-### 5. Infrastructure as Code – Terraform
-
-The Terraform code lives under `terraform/`.  
-**Key resources:**
-
-- **Resource Group** – `devops-pro-rg`
-- **AKS Cluster** – `devops-pro-aks` (node pool: Standard_DS2_v2, 3 nodes)
-- **Azure Container Registry** – imported from step 4 (data source)
-- **Azure Key Vault** – holds client secret, JWT signing keys
-- **App Service (Optional) / Azure Static Web Apps** – for UI
-- **Azure DNS Zone** – if you own a custom domain
-
-#### 5.1 Initialise & Apply
-
+#### 2. Configure Terraform Variables
+Copy the template file and fill in your values:
 ```powershell
 cd terraform
-terraform init
-terraform fmt -check   # ensure style compliance
-terraform validate
-terraform plan -out=plan.out
-terraform apply "plan.out"
+cp terraform.tfvars.template terraform.tfvars
+# Edit terraform.tfvars with your values:
 ```
 
-> **Terraform variables** (`terraform/terraform.tfvars`) should contain:
-
+Example `terraform.tfvars`:
 ```hcl
-resource_group_name = "devops-pro-rg"
-location            = "eastus"
-acr_name            = "devopsproacr"
-ui_client_id        = "<UI_CLIENT_ID>"
-api_client_id       = "<API_CLIENT_ID>"
-api_client_secret   = "<API_CLIENT_SECRET>"
-tenant_id           = "<AZURE_TENANT_ID>"
-domain_name         = "<YOUR_DOMAIN>"
+project_name = "devopspro"
+azure_tenant_id       = "your-azure-tenant-id"
+azure_subscription_id = "your-azure-subscription-id"
+azure_client_id       = "your-azure-service-principal-client-id"
+azure_client_secret   = "your-azure-service-principal-client-secret"
+azure_region = "eastus"
+azure_metadata_host = "https://management.azure.com"
+aks_node_count = 3
 ```
 
-> **Important**: Keep `terraform.tfvars` out of source control – add it to `.gitignore`.  
+#### 3. Run Terraform Workflow
+```powershell
+# Initialize Terraform (download providers, set up backend)
+terraform init
+
+# Format all Terraform files in the directory
+terraform fmt -recursive
+
+# Validate configuration
+terraform validate
+
+# Preview changes
+terraform plan
+
+# Apply configuration (create resources)
+terraform apply
+```
+
+#### 4. Terraform Outputs
+After successful deployment, Terraform will output critical values:
+- `resource_group_name`: Name of the created resource group
+- `acr_login_server`: ACR login server (for docker pushes)
+- `redis_hostname` / `redis_ssl_port` / `redis_primary_access_key`: Managed Redis connection details
+- `aks_kubeconfig`: Command to retrieve AKS credentials
+
+---
+
+### 5. Container Registry (ACR) & Image Build
+
+After running Terraform to create your infrastructure, retrieve your ACR details and build/push your microservice container images.
+
+#### 5.1 Retrieve ACR details and Login
+```powershell
+cd terraform
+# Get your ACR login server (output from Terraform)
+$acrLoginServer = terraform output -raw acr_login_server
+# Extract the ACR name from the login server (everything before .azurecr.io)
+$acrName = $acrLoginServer.Split('.')[0]
+
+# Log in to your registry
+az acr login --name $acrName
+```
+
+#### 5.2 Build & Push Microservice Container Images
+Run the following commands from the repository root (run `cd ..` first if you are still in the `terraform` directory):
+
+```powershell
+# Go back to repository root
+cd ..
+
+# config-service
+docker build -t "$acrLoginServer/config-service:latest" -f config-service/Dockerfile .
+docker push "$acrLoginServer/config-service:latest"
+
+# gateway-service
+docker build -t "$acrLoginServer/gateway-service:latest" -f gateway-service/Dockerfile .
+docker push "$acrLoginServer/gateway-service:latest"
+
+# incident-service
+docker build -t "$acrLoginServer/incident-service:latest" -f incident-service/Dockerfile .
+docker push "$acrLoginServer/incident-service:latest"
+
+# log-analyzer-service
+docker build -t "$acrLoginServer/log-analyzer-service:latest" -f log-analyzer-service/Dockerfile .
+docker push "$acrLoginServer/log-analyzer-service:latest"
+
+# log-collector-service
+docker build -t "$acrLoginServer/log-collector-service:latest" -f log-collector-service/Dockerfile .
+docker push "$acrLoginServer/log-collector-service:latest"
+
+# notification-service
+docker build -t "$acrLoginServer/notification-service:latest" -f notification-service/Dockerfile .
+docker push "$acrLoginServer/notification-service:latest"
+
+# repo-scanner-service
+docker build -t "$acrLoginServer/repo-scanner-service:latest" -f repo-scanner-service/Dockerfile .
+docker push "$acrLoginServer/repo-scanner-service:latest"
+
+# Build & push React Dashboard UI
+cd dashboard-ui
+npm ci
+npm run build   # Vite builds to /dist
+docker build -t "$acrLoginServer/dashboard-ui:latest" .
+docker push "$acrLoginServer/dashboard-ui:latest"
+cd ..
+```
 
 ---
 
 ### 6. Deploy Backend Microservices to AKS
 
-1. **Get AKS credentials**
+In DevOps Pro, the backend microservices and internal service load balancers are **automatically provisioned and deployed to AKS by Terraform** via `kubernetes.tf` during the `terraform apply` step. There are no manual Helm chart commands required.
 
-   ```powershell
-   az aks get-credentials --resource-group devops-pro-rg --name devops-pro-aks
-   ```
+#### 6.1 Set Up kubectl Credentials
+Once Terraform completes, configure your local environment to access the AKS cluster:
 
-2. **Create a namespace (optional)**
+```powershell
+# Get your resource group name and project prefix (from repository root)
+$rgName = terraform -chdir=terraform output -raw resource_group_name
+$projectName = "devopspro" # Replace with your project_name from terraform.tfvars
 
-   ```bash
-   kubectl create namespace devops-pro
-   ```
+# Fetch kubeconfig credentials for kubectl
+az aks get-credentials --resource-group $rgName --name "${projectName}-aks" --overwrite-existing
+```
 
-3. **Deploy using the provided Helm chart** (`helm/` folder)
+#### 6.2 Verify the Running Microservices
+Once the kubeconfig context is set up, verify that the 7 backend pods are running and healthy inside the AKS cluster:
 
-   ```bash
-   helm upgrade --install gateway-service helm/gateway-service `
-       --namespace devops-pro `
-       --set image.repository=devopsproacr.azurecr.io/gateway-service `
-       --set image.tag=latest `
-       --set azure.tenantId=$tenant_id `
-       --set azure.clientId=$api_client_id `
-       --set azure.clientSecret=$api_client_secret
-   ```
+```powershell
+# View all running pods
+kubectl get pods
 
-   Repeat for `config-service`, `pipeline-service`, … (the chart accepts the same values).
+# View services and public IP endpoints of LoadBalancers
+kubectl get services
+```
 
-4. **Verify pods**
-
-   ```bash
-   kubectl get pods -n devops-pro
-   ```
-
-5. **Expose services via an Ingress controller** (NGINX is provisioned by Terraform)
-
-   ```yaml
-   # helm/gateway-service/values.yaml (excerpt)
-   ingress:
-     enabled: true
-     className: nginx
-     hosts:
-       - host: api.<YOUR_DOMAIN>
-         paths:
-           - path: /
-             pathType: Prefix
-   ```
-
-   Apply the chart again if you edited the values.
-
----
+The Gateway Service (`gateway-service`) is automatically configured to proxy traffic to internal services, and acts as the entry point for frontend API calls.
 
 ### 7. Deploy Front‑end (React + Vite)
 
@@ -545,6 +527,65 @@ Add the **Instrumentation Key** to the UI config (`REACT_APP_APPINSIGHTS_KEY`).
 - [ ] Entra ID token contains expected scopes (`api.read`).
 - [ ] Application Insights dashboards show traffic and no error spikes.
 - [ ] CI/CD pipeline passes on the main branch and deploys automatically.
+
+---
+
+### 13. Troubleshooting Common Deployment Issues
+
+During deployment to real Azure, you might run into common regional, authorization, or network constraints. Use this section to resolve them.
+
+#### 13.1 Azure Subscription Policy Restrictions (`RequestDisallowedByAzure`)
+* **Error**: `RequestDisallowedByAzure: Resource ... was disallowed by Azure: This policy maintains a set of best available regions...`
+* **Cause**: Your subscription is restricted to deploying resources in specific allowed regions.
+* **Resolution**: Open your `terraform/terraform.tfvars` file and update the `azure_region` variable to match your allowed region (e.g., `azure_region = "centralindia"`).
+
+#### 13.2 Missing Azure Provider Registrations (`MissingSubscriptionRegistration`)
+* **Error**: `MissingSubscriptionRegistration: The subscription is not registered to use namespace 'Microsoft.DocumentDB' (or 'Microsoft.KeyVault').`
+* **Cause**: Azure requires explicit namespace registration for services before creating them.
+* **Resolution**: Register the namespaces using Azure CLI and wait 1-2 minutes:
+  ```powershell
+  az provider register --namespace Microsoft.DocumentDB
+  az provider register --namespace Microsoft.KeyVault
+  ```
+
+#### 13.3 vCPU Quota Limits (`ErrCode_InsufficientVCPUQuota`)
+* **Error**: `Insufficient regional vcpu quota left... requested quota 4.`
+* **Cause**: Your Azure subscription limits the number of vCPUs you can deploy in a region.
+* **Resolution**: In `main.tf`, downscale your default node pool to 1 node, disable additional workload pools (set `count = 0`), and consider using memory-optimized VM sizes like `Standard_E2s_v3` (2 vCPUs, 16 GB RAM) to double your memory capacity within the 2 vCPU limit.
+
+#### 13.4 kubelogin Authentication Errors (`exec: executable kubelogin not found`)
+* **Error**: `getting credentials: exec: executable kubelogin not found`
+* **Cause**: AKS is configured with Azure Active Directory (Entra ID) authentication, which requires installing `kubelogin` locally.
+* **Resolution**: Bypass this by fetching the administrator credentials directly (uses cert-based auth, no tools needed):
+  ```powershell
+  az aks get-credentials --resource-group <resource_group_name> --name <aks_cluster_name> --overwrite-existing --admin
+  ```
+
+#### 13.5 Private Cluster Connection Timeouts (`dial tcp ... no such host`)
+* **Error**: `dial tcp: lookup devopspro-aks-xxxx: no such host` or connection timeouts.
+* **Cause**: AKS was created with `private_cluster_enabled = true` making the API server unreachable from your local network.
+* **Resolution**: Change `private_cluster_enabled = false` in `main.tf`. If you are stuck in a catch-22 (refresh fails because cluster is unreachable), run a targeted apply to make the cluster public first:
+  ```powershell
+  terraform -chdir=terraform apply -var="create_azure_infra=true" -target="azurerm_kubernetes_cluster.aks[0]" -auto-approve
+  ```
+
+#### 13.6 Kubernetes Provider Connection Refused (`dial tcp [::1]:80: connectex`)
+* **Error**: Provider trying to connect to `localhost:80` and failing during planning/refresh.
+* **Cause**: Configuring the `kubernetes` provider dynamically via AKS resource outputs fails during the refresh phase because credentials evaluate to empty.
+* **Resolution**: Configure the provider to read directly from your local kubeconfig file in `kubernetes.tf`:
+  ```terraform
+  provider "kubernetes" {
+    config_path = "~/.kube/config"
+  }
+  ```
+
+#### 13.7 Docker Context Errors during Image Builds (`/config-service/src: not found`)
+* **Error**: `failed to calculate checksum: "/config-service/src": not found`
+* **Cause**: The multi-module Maven project Dockerfiles contain relative copies and must be built from the repository root.
+* **Resolution**: Run the `docker build` command from the **repository root directory** using the root `.` as the build context:
+  ```powershell
+  docker build -t "${acrLoginServer}/${service}:latest" -f "${service}/Dockerfile" .
+  ```
 
 ---
 
