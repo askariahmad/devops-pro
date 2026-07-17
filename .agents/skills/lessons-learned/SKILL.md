@@ -62,8 +62,13 @@ In minimal Linux containers (like Debian trixie/slim), running PowerShell Core (
 * **Resolution**: Set the environment variable `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true` in the container or the pipeline configuration block to enable globalization-invariant execution.
 
 ## 11. Jenkins Local Git Checkout Restrictions
-Jenkins Git plugin blocks checkouts from local `file://` paths by default for security.
-* **Resolution**: Inject `-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true` into the Jenkins container's `JAVA_OPTS` on startup.
+Jenkins Git plugin and Git clients block checkouts and submodule cloning from local `file://` paths by default for security (throwing `fatal: transport 'file' not allowed`).
+* **Resolution**: 
+  1. Inject `-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true` into the Jenkins container's `JAVA_OPTS` on startup.
+  2. Configure Git inside the container to allow local file protocol transports:
+     ```bash
+     git config --global protocol.file.allow always
+     ```
 
 ## 12. Container Kubeconfig Host Bridging
 When running `kubectl` inside a containerized Jenkins to interact with a local Kubernetes cluster, using a host-copied kubeconfig fails because it targets loopback address `127.0.0.1`.

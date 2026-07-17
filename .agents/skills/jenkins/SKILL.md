@@ -19,10 +19,11 @@ To create or update a Jenkins job without API credentials, write a `config.xml` 
 2. Set ownership: `chown -R jenkins:jenkins /var/jenkins_home/jobs/<job-name>`.
 3. Restart: `docker restart jenkins-local`.
 
-## 3. Git safe.directory Configs
-To bypass ownership security warnings in containers accessing mounted volumes, configure Git to trust all directories:
+## 3. Git safe.directory & Submodule Transport Configs
+To bypass ownership security warnings in containers accessing mounted volumes and allow cloning of local submodules, configure Git to trust all directories and allow `file` protocol transports:
 ```bash
 git config --global --add safe.directory '*'
+git config --global protocol.file.allow always
 ```
 
 ## 4. .NET Globalization Invariant Override
