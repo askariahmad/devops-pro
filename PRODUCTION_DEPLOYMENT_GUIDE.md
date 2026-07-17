@@ -589,6 +589,34 @@ During deployment to real Azure, you might run into common regional, authorizati
 
 ---
 
+### 14. User Role Management
+
+DevOps Pro uses Role-Based Access Control (RBAC) to enforce security boundaries. Roles govern permissions such as triggering SAST scans, editing configurations, or synchronizing Jira tickets.
+
+#### 14.1 Predefined Roles & Permissions
+The system defines 4 default user roles, ordered from highest to lowest privilege:
+1. **`ROLE_SYSTEM_ADMIN`**: Full read/write access across all system settings, configurations, and incidents for all tenants.
+2. **`ROLE_TENANT_ADMIN`**: Allowed to edit configurations and add repositories for their specific tenant.
+3. **`ROLE_SECURITY_ENGINEER`**: Allowed to view and transition security incidents, trigger manual scans, and initiate code auto-fixes.
+4. **`ROLE_DEVELOPER_VIEWER`**: Read-only access to view logs, metrics, repository scan summaries, and active incidents.
+
+#### 14.2 Role Mapping: Local Accounts (MongoDB)
+For users utilizing standard email/password logins, roles are stored statically in the database:
+- **Default Seeding**: Seeded users are configured in `gateway-service` under [`DataSeeder.java`](file:///C:/Users/ahmad/IdeaProjects/devops-pro/gateway-service/src/main/java/com/devops/gateway/config/DataSeeder.java).
+- **Modification**: You can modify roles for existing accounts by directly updating the `role` field on user documents in your Cosmos DB MongoDB collection, or by creating a signup registration API flow.
+
+#### 14.3 Role Mapping: Microsoft Entra ID (Azure AD)
+When authenticating via Entra ID, the application dynamically resolves the user's role on login based on their email prefix inside `gateway-service`'s [`AuthController.java`](file:///C:/Users/ahmad/IdeaProjects/devops-pro/gateway-service/src/main/java/com/devops/gateway/controller/AuthController.java):
+- Emails starting with `sysadmin` ➔ **`ROLE_SYSTEM_ADMIN`**
+- Emails starting with `tenantadmin` ➔ **`ROLE_TENANT_ADMIN`**
+- Emails starting with `security` ➔ **`ROLE_SECURITY_ENGINEER`**
+- Emails starting with `dev` ➔ **`ROLE_DEVELOPER_VIEWER`**
+- All other domains/emails ➔ Defaults to **`ROLE_DEVELOPER_VIEWER`**
+
+*To customize these mappings (e.g., using Entra ID AD Groups or App Roles claims), modify the `entraLogin()` method inside `AuthController.java` to extract the roles from the JWT token claims.*
+
+---
+
 #### 📎 Helpful Links (clickable)
 
 - **Terraform folder**: [terraform](file:///c:/Users/ahmad/IdeaProjects/devops-pro/terraform)
