@@ -49,6 +49,7 @@ locals {
     { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "true" : "false" },
     { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_redis_cache.redis[0].primary_access_key : "" },
     { name = "KAFKA_BROKERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
+    { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "AUTH_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "https://devops-pro-${var.environment}-aks.azure.com" : "http://host.docker.internal:4577" },
     { name = "AZURE_KEY_VAULT_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_key_vault.keyvault[0].vault_uri : "" },
     { name = "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY", value = var.create_azure_infra ? "your-instrumentation-key-here" : "" }
@@ -56,13 +57,14 @@ locals {
 
   # Environment variables for local development with Floci
   env_vars_local = [
-    { name = "SPRING_DATA_MONGODB_URI", value = "mongodb://localhost:27017" },
-    { name = "SPRING_DATA_REDIS_HOST", value = "localhost" },
+    { name = "SPRING_DATA_MONGODB_URI", value = "mongodb://host.docker.internal:27017" },
+    { name = "SPRING_DATA_REDIS_HOST", value = "host.docker.internal" },
     { name = "SPRING_DATA_REDIS_PORT", value = "6379" },
     { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = "false" },
     { name = "SPRING_DATA_REDIS_PASSWORD", value = "" },
-    { name = "KAFKA_BROKERS", value = "http://localhost:4577" },
-    { name = "AUTH_URL", value = "http://localhost:4577" },
+    { name = "KAFKA_BROKERS", value = "host.docker.internal:4577" },
+    { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = "host.docker.internal:4577" },
+    { name = "AUTH_URL", value = "http://host.docker.internal:4577" },
     { name = "AZURE_KEY_VAULT_URL", value = "" },
     { name = "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY", value = "" }
   ]
