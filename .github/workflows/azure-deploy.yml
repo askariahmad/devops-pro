@@ -1,0 +1,128 @@
+name: DevOps Pro Azure CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_azure_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+      TF_VAR_azure_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+      TF_VAR_create_azure_infra: "true"
+      TF_VAR_create_cosmos_and_keyvault: "true"
+      TF_VAR_environment: "prod"
+      TF_VAR_azure_region: "centralindia"
+
+    steps:
+      # 1. Checkout codebase
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Java JDK 21
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # 3. Compile Java backend applications
+      - name: Build Java Backend Services
+        run: |
+          mvn clean package -DskipTests
+
+      # 4. Authenticate to Azure
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 5. Set up Terraform CLI
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      # 6. Initialize Terraform
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      # 7. Apply Terraform (Provisions AKS, ACR, Redis, CosmosDB, and sets up backend deployments)
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+
+      # 8. Retrieve ACR and AKS credentials from Terraform
+      - name: Fetch Azure Context & Credentials
+        id: fetch-ctx
+        run: |
+          cd terraform
+          # Get ACR server and resource group name
+          ACR_SERVER=$(terraform output -raw acr_login_server)
+          RG_NAME=$(terraform output -raw resource_group_name)
+          echo "acr_server=$ACR_SERVER" >> $GITHUB_OUTPUT
+          echo "rg_name=$RG_NAME" >> $GITHUB_OUTPUT
+
+          # Fetch AKS admin credentials
+          az aks get-credentials --resource-group $RG_NAME --name "devops-pro-prod-aks" --overwrite-existing --admin
+
+      # 9. Build and Push Backend Docker Images to ACR
+      - name: Build and Push Backend Images
+        run: |
+          ACR_SERVER="${{ steps.fetch-ctx.outputs.acr_server }}"
+          az acr login --name "$ACR_SERVER"
+
+          services=("config-service" "gateway-service" "incident-service" "repo-scanner-service" "log-analyzer-service" "log-collector-service" "notification-service")
+
+          for service in "${services[@]}"; do
+            echo "Building and pushing $service..."
+            docker build -t "$ACR_SERVER/$service:latest" -f "$service/Dockerfile" .
+            docker push "$ACR_SERVER/$service:latest"
+          done
+
+      # 10. Force AKS to pull the newly built backend images
+      - name: Restart Backend Pods in AKS
+        run: |
+          kubectl rollout restart deployment
+
+      # 11. Retrieve public Gateway IP from AKS
+      - name: Retrieve Gateway External IP
+        id: get-ip
+        run: |
+          # Wait up to 2 minutes for external IP to be provisioned if it isn't ready
+          for i in {1..24}; do
+            GATEWAY_IP=$(kubectl get service gateway-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [ ! -z "$GATEWAY_IP" ]; then
+              echo "gateway_ip=$GATEWAY_IP" >> $GITHUB_OUTPUT
+              echo "Gateway IP found: $GATEWAY_IP"
+              exit 0
+            fi
+            echo "Waiting for Gateway External IP..."
+            sleep 5
+          done
+          echo "Timeout waiting for LoadBalancer IP"
+          exit 1
+
+      # 12. Deploy Frontend to Azure Static Web Apps (SWA)
+      - name: Deploy Frontend to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "dashboard-ui"
+          output_location: "dist"
+        env:
+          VITE_API_BASE_URL: "http://${{ steps.get-ip.outputs.gateway_ip }}:8080/api/v1"
