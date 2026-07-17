@@ -183,7 +183,12 @@ function Start-Emulator {
         }
         if ($certDownloaded) {
             Log-Step "Importing TLS certificate to Trusted Root store silently..."
-            certutil -user -addstore -f root $certPath | Out-Null
+            if ($IsWindows) {
+                certutil -user -addstore -f root $certPath | Out-Null
+            } else {
+                Copy-Item $certPath "/usr/local/share/ca-certificates/floci-az.crt" -Force
+                & update-ca-certificates | Out-Null
+            }
             Log-Success "TLS Certificate configured successfully!"
         } else {
             Log-Warning "Failed to download TLS certificate. Emulator may have SSL validation issues."
