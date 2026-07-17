@@ -1,0 +1,17 @@
+$kind: http-request
+name: Save Rule Knowledge
+method: POST
+url: '{{baseUrl}}/api/v1/rules'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "ruleKey": "java:S3649",
+      "why": "SQL injection allows attackers to manipulate database queries",
+      "howToFix": "Use PreparedStatement with parameterized queries",
+      "organization": "my-org"
+    }

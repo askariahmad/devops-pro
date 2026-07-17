@@ -1,0 +1,5 @@
+$kind: http-request
+name: Search Issues
+method: GET
+url: 'http://localhost:8085/api/mock-sonar/api/issues/search'
+order: 1000

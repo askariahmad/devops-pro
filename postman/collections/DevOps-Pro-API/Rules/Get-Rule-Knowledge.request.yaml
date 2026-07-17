@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Rule Knowledge
+method: GET
+url: '{{baseUrl}}/api/v1/rules/:ruleKey'
+order: 1000
+pathVariables:
+  - key: ruleKey
+    value: 'java:S3649'

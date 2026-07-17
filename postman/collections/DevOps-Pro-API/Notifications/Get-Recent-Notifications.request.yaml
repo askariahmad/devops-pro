@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Recent Notifications
+method: GET
+url: '{{baseUrl}}/api/v1/notifications'
+order: 2000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'

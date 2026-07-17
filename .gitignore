@@ -4,7 +4,6 @@
 
 # Postman collections and environment files
 .postman/
-postman/
 
 # Floci Azure emulator certificate (local only)
 floci-az.pem

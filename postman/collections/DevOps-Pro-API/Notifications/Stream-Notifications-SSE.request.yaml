@@ -1,0 +1,10 @@
+$kind: http-request
+name: 'Stream Notifications (SSE)'
+method: GET
+url: '{{baseUrl}}/api/v1/notifications/stream'
+order: 3000
+headers:
+  - key: Accept
+    value: text/event-stream
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'

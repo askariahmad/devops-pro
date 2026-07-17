@@ -1,0 +1,19 @@
+$kind: http-request
+name: Auto Fix Issue
+method: POST
+url: '{{baseUrl}}/api/v1/scanner/autofix'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+body:
+  type: json
+  content: |-
+    {
+      "repository": "org/repo1",
+      "filePath": "src/main/java/com/app/repository/UserRepository.java",
+      "exactCodeFix": "Use PreparedStatement instead of string concatenation",
+      "issueTitle": "SQL Injection vulnerability"
+    }

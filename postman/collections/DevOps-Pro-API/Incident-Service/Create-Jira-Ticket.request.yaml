@@ -1,0 +1,11 @@
+$kind: http-request
+name: Create Jira Ticket
+method: POST
+url: '{{baseUrl}}/api/v1/incidents/:id/jira'
+order: 5000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{incidentId}}'

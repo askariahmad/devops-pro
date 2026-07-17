@@ -1,0 +1,11 @@
+$kind: http-request
+name: Trigger Scan
+method: POST
+url: '{{baseUrl}}/api/v1/scanner/scan'
+order: 1000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+queryParams:
+  - key: repo
+    value: org/repo1

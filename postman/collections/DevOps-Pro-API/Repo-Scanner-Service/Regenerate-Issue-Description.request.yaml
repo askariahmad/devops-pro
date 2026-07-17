@@ -1,0 +1,18 @@
+$kind: http-request
+name: Regenerate Issue Description
+method: POST
+url: '{{baseUrl}}/api/v1/scanner/regenerate'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+body:
+  type: json
+  content: |-
+    {
+      "title": "SQL Injection vulnerability",
+      "severity": "CRITICAL",
+      "repository": "org/repo1"
+    }

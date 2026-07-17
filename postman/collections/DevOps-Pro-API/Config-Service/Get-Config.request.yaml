@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Config
+method: GET
+url: '{{baseUrl}}/api/v1/config'
+order: 1000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'

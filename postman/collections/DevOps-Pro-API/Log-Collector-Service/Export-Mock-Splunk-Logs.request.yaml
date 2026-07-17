@@ -1,0 +1,5 @@
+$kind: http-request
+name: Export Mock Splunk Logs
+method: GET
+url: 'http://localhost:8083/api/mock-splunk/export'
+order: 1000

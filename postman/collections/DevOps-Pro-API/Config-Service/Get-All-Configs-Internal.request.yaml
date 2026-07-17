@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get All Configs (Internal)
+method: GET
+url: '{{baseUrl}}/api/v1/config/internal/all'
+order: 3000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'

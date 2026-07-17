@@ -1,0 +1,11 @@
+$kind: http-request
+name: Get Jira Transitions
+method: GET
+url: '{{baseUrl}}/api/v1/incidents/:id/jira/transitions'
+order: 10000
+headers:
+  - key: X-Tenant-Id
+    value: '{{tenantId}}'
+pathVariables:
+  - key: id
+    value: '{{incidentId}}'
