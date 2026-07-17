@@ -114,9 +114,17 @@ function Build-Docker-Images {
     foreach ($service in $services) {
         Log-Step "Building ${service}..."
         docker build -t "devopsproprodacr.azurecr.io/${service}:latest" -f "${service}/Dockerfile" .
+        if ($LASTEXITCODE -ne 0) {
+            Log-Error "Failed to build Docker image for ${service}!"
+            exit $LASTEXITCODE
+        }
     }
     Log-Step "Building dashboard-ui..."
     docker build -t "devopsproprodacr.azurecr.io/dashboard-ui:latest" -f "dashboard-ui/Dockerfile" ./dashboard-ui
+    if ($LASTEXITCODE -ne 0) {
+        Log-Error "Failed to build Docker image for dashboard-ui!"
+        exit $LASTEXITCODE
+    }
     Log-Success "All Docker images built successfully!"
 }
 
@@ -339,11 +347,15 @@ elseif ($Stage -eq "BuildService") {
     if ($ServiceName -eq "dashboard-ui") {
         Log-Info "Building UI image: dashboard-ui..."
         npm ci --prefix dashboard-ui
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         npm run build --prefix dashboard-ui
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         & docker build -t devopsproprodacr.azurecr.io/dashboard-ui:latest -f dashboard-ui/Dockerfile dashboard-ui/
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
         Log-Info "Building service image: $ServiceName..."
         & docker build -t "devopsproprodacr.azurecr.io/${ServiceName}:latest" -f "${ServiceName}/Dockerfile" .
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 }
 elseif ($Stage -eq "Emulator") {
