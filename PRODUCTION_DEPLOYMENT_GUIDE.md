@@ -437,6 +437,15 @@ kubectl apply -f helm/dashboard-ui/values.yaml \
   - `api-client-secret` (value from step 3)
   - `jwt-signing-key` (RSA key pair)
 
+You can set these secrets using the Azure CLI:
+```powershell
+# Set the API Client Secret
+az keyvault secret set --vault-name "devops-pro-prod-kv" --name "api-client-secret" --value "<YOUR_CLIENT_SECRET>"
+
+# Set the JWT Signing Key
+az keyvault secret set --vault-name "devops-pro-prod-kv" --name "jwt-signing-key" --value "<YOUR_JWT_SIGNING_KEY>"
+```
+
 - **Inject into AKS** using **Azure Key Vault Provider** (installed by Terraform):
 
 ```yaml
