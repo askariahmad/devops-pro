@@ -38,11 +38,11 @@ locals {
 
   # Environment variables for Azure production
   env_vars_azure = [
-    { name = "SPRING_DATA_MONGODB_URI", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_cosmosdb_account.cosmosdb[0].primary_mongodb_connection_string : "mongodb://host.docker.internal:27017" },
+    { name = "SPRING_DATA_MONGODB_URI", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_cosmosdb_account.cosmosdb[0].primary_mongodb_connection_string) : "mongodb://host.docker.internal:27017" },
     { name = "SPRING_DATA_REDIS_HOST", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].hostname : "host.docker.internal" },
     { name = "SPRING_DATA_REDIS_PORT", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "10000" : "6379" },
     { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "true" : "false" },
-    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].default_database[0].primary_access_key : "" },
+    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_managed_redis.redis[0].default_database[0].primary_access_key) : "" },
     { name = "KAFKA_BROKERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "AUTH_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "https://devops-pro-${var.environment}-aks.azure.com" : "http://host.docker.internal:4577" },
