@@ -74,6 +74,27 @@ Jenkins Git plugin and Git clients block checkouts and submodule cloning from lo
 When running `kubectl` inside a containerized Jenkins to interact with a local Kubernetes cluster, using a host-copied kubeconfig fails because it targets loopback address `127.0.0.1`.
 * **Resolution**: Replace `127.0.0.1` with `host.docker.internal` in the container's kubeconfig (`~/.kube/config`) and add `insecure-skip-tls-verify: true` to bypass certificate SAN restrictions.
 
+## 13. PowerShell Native Executable Exit Codes
+In PowerShell, running native external executables (like `docker`, `npm`, or `mvn`) that fail with a non-zero exit status does not trigger a terminating exception, even if `$ErrorActionPreference = 'Stop'` is defined. This allows scripts to complete with exit code `0` (success), masking build failures in CI dashboards.
+* **Resolution**: Always check the **`$LASTEXITCODE`** variable immediately after calling a native external executable, and exit the script with that code if it is non-zero:
+  ```powershell
+  & docker build -t my-image .
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  ```
+
+## 14. Maven Multi-Module Docker Compile Issues
+Using the `-am` (also make) flag in `mvn clean package -pl <module> -am` inside a Docker container where only the target module's `src/` folder is copied causes Maven to crash. The flag forces Maven to compile all reactor dependencies of the target module, which fails because the source files of the other modules are missing.
+* **Resolution**: Omit the `-am` flag from the build command inside Dockerfiles so Maven only builds the target module in isolation.
+
+## 15. Relative Submodules for Local CI/CD Execution
+If submodule URLs in `.gitmodules` point to remote hosts (e.g. GitHub), Jenkins checking out a local pipeline from `/workspace` will clone the old, unmodified submodules from the remote server instead of your modified local submodules.
+* **Resolution**: Change all submodule URLs in `.gitmodules` to relative paths (e.g., `url = ./config-service`). Stage and commit the Dockerfile changes inside each submodule directory first, and then commit the updated submodule pointers in the parent repository.
+
+## 16. Local Submodule SCM Checkout Tracking Error
+When submodules point to relative local paths, enabling `trackingSubmodules: true` in Jenkins SCM checkout causes Git to crash with `fatal: Unable to find refs/remotes/origin/HEAD revision`. This happens because local directories do not have remote branches or remote HEAD tracking configurations.
+* **Resolution**: Set `trackingSubmodules: false` inside the SCM checkout configuration in the `Jenkinsfile` so it checks out the exact commit hashes recorded in the parent repository.
+
+
 
 
 

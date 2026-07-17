@@ -33,3 +33,20 @@ environment {
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = 'true'
 }
 ```
+
+## 5. Local Submodule SCM Checkout Configuration
+When cloning microservice submodules from local paths (`./config-service` relative URLs), SCM checkouts must disable `trackingSubmodules`. Otherwise, Git crashes trying to locate remote references:
+```groovy
+checkout([$class: 'GitSCM', 
+    branches: [[name: '*/feat/azure-migration']], 
+    extensions: [[$class: 'SubmoduleOption', recursiveSubmodules: true, disableSubmodules: false, trackingSubmodules: false]], 
+    userRemoteConfigs: [[url: 'file:///workspace']]
+])
+```
+
+## 6. Self-Healing Tool Bootstrap
+To support zero-config, portable deployments across fresh container instances, include a bootstrap check at the beginning of the pipeline to verify and automatically install missing tools:
+- Checks for `pwsh`, `terraform`, `kubectl`, `npm`, and `mvn`.
+- Installs PowerShell via tarball to bypass Debian library version mismatches.
+- Installs other CLI tools via `apt-get` non-interactively.
+
