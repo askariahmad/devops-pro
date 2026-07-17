@@ -141,15 +141,26 @@ function Start-Emulator {
         
         Log-Step "Waiting for Floci-AZ to initialize on port 4577..."
         $ready = $false
+        $targetHost = "127.0.0.1"
         for ($i = 0; $i -lt 30; $i++) {
             try {
                 $client = [System.Net.Sockets.TcpClient]::new()
                 $client.Connect("127.0.0.1", 4577)
                 $client.Dispose()
+                $targetHost = "127.0.0.1"
                 $ready = $true
                 break
             } catch {
-                Start-Sleep -Seconds 1
+                try {
+                    $client = [System.Net.Sockets.TcpClient]::new()
+                    $client.Connect("host.docker.internal", 4577)
+                    $client.Dispose()
+                    $targetHost = "host.docker.internal"
+                    $ready = $true
+                    break
+                } catch {
+                    Start-Sleep -Seconds 1
+                }
             }
         }
         if (-not $ready) {
@@ -163,7 +174,7 @@ function Start-Emulator {
         $certDownloaded = $false
         for ($j = 0; $j -lt 15; $j++) {
             try {
-                Invoke-WebRequest -Uri "http://localhost:4577/_floci/tls-cert" -OutFile $certPath -UseBasicParsing -TimeoutSec 2
+                Invoke-WebRequest -Uri "http://${targetHost}:4577/_floci/tls-cert" -OutFile $certPath -UseBasicParsing -TimeoutSec 2
                 $certDownloaded = $true
                 break
             } catch {
@@ -183,15 +194,26 @@ function Start-Emulator {
         
         Log-Step "Waiting for Floci-AWS to initialize on port 4566..."
         $ready = $false
+        $targetHost = "127.0.0.1"
         for ($i = 0; $i -lt 30; $i++) {
             try {
                 $client = [System.Net.Sockets.TcpClient]::new()
                 $client.Connect("127.0.0.1", 4566)
                 $client.Dispose()
+                $targetHost = "127.0.0.1"
                 $ready = $true
                 break
             } catch {
-                Start-Sleep -Seconds 1
+                try {
+                    $client = [System.Net.Sockets.TcpClient]::new()
+                    $client.Connect("host.docker.internal", 4566)
+                    $client.Dispose()
+                    $targetHost = "host.docker.internal"
+                    $ready = $true
+                    break
+                } catch {
+                    Start-Sleep -Seconds 1
+                }
             }
         }
         if (-not $ready) {
