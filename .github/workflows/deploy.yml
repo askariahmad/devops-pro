@@ -1,0 +1,169 @@
+name: Deploy DevOps-Pro to Azure
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      RESOURCE_GROUP: devops-pro-rg
+      LOCATION: eastus
+      ACR_NAME: devopsproacr
+      AKS_CLUSTER: devops-pro-aks
+      UI_APP_NAME: devops-pro-ui
+      TERRAFORM_DIR: terraform
+      UI_CLIENT_ID: ${{ secrets.UI_CLIENT_ID }}
+      API_CLIENT_ID: ${{ secrets.API_CLIENT_ID }}
+      API_CLIENT_SECRET: ${{ secrets.API_CLIENT_SECRET }}
+      TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Azure CLI extensions
+        run: |
+          az extension add -n containerinstance
+          az extension add -n aks-preview
+          az extension add -n staticwebapp
+
+      # ---------- Build and push backend images ----------
+      - name: Build backend services (Maven)
+        run: |
+          cd gateway-service
+          mvn clean package -DskipTests
+          cd ../config-service
+          mvn clean package -DskipTests
+          # Add other services as needed
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login -n ${{ env.ACR_NAME }}
+
+      - name: Build & push Docker images for backend
+        run: |
+          # Gateway Service
+          cd gateway-service
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/gateway-service:${{ github.sha }} .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/gateway-service:${{ github.sha }}
+          cd ..
+          # Config Service
+          cd config-service
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/config-service:${{ github.sha }} .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/config-service:${{ github.sha }}
+          cd ..
+          # Add other services similarly
+
+      # ---------- Build and push UI image ----------
+      - name: Install frontend dependencies
+        run: |
+          cd dashboard-ui
+          npm ci
+
+      - name: Build UI with Vite
+        run: |
+          cd dashboard-ui
+          npm run build
+
+      - name: Build & push UI Docker image
+        run: |
+          cd dashboard-ui
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/dashboard-ui:${{ github.sha }} .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/dashboard-ui:${{ github.sha }}
+
+      # ---------- Terraform Infrastructure ----------
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.5'
+
+      - name: Terraform init & plan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform init -input=false
+          terraform fmt -check
+          terraform validate
+          terraform plan -out=plan.out -var="resource_group_name=${{ env.RESOURCE_GROUP }}" \
+            -var="location=${{ env.LOCATION }}" \
+            -var="acr_name=${{ env.ACR_NAME }}" \
+            -var="ui_client_id=${{ env.UI_CLIENT_ID }}" \
+            -var="api_client_id=${{ env.API_CLIENT_ID }}" \
+            -var="api_client_secret=${{ env.API_CLIENT_SECRET }}" \
+            -var="tenant_id=${{ env.TENANT_ID }}"
+
+      - name: Terraform apply
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform apply -auto-approve plan.out
+
+      # ---------- Deploy to AKS via Helm ----------
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP }} --name ${{ env.AKS_CLUSTER }} --overwrite-existing
+
+      - name: Deploy services with Helm
+        run: |
+          # Gateway Service
+          helm upgrade --install gateway-service helm/gateway-service \
+            --namespace devops-pro \
+            --set image.repository=${{ env.ACR_NAME }}.azurecr.io/gateway-service \
+            --set image.tag=${{ github.sha }} \
+            --set azure.tenantId=${{ env.TENANT_ID }} \
+            --set azure.clientId=${{ env.API_CLIENT_ID }} \
+            --set azure.clientSecret=${{ env.API_CLIENT_SECRET }}
+          # Config Service (repeat similarly)
+          helm upgrade --install config-service helm/config-service \
+            --namespace devops-pro \
+            --set image.repository=${{ env.ACR_NAME }}.azurecr.io/config-service \
+            --set image.tag=${{ github.sha }} \
+            --set azure.tenantId=${{ env.TENANT_ID }} \
+            --set azure.clientId=${{ env.API_CLIENT_ID }} \
+            --set azure.clientSecret=${{ env.API_CLIENT_SECRET }}
+
+      # ---------- Deploy UI to Azure Static Web Apps ----------
+      - name: Deploy UI to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for GitHub integrations (i.e. PR comments)
+          action: "upload"
+          app_location: "dashboard-ui"
+          output_location: "dist"
+          skip_app_build: true
+
+      # ---------- Post‑deployment validation (optional) ----------
+      - name: Verify API health endpoint
+        run: |
+          curl -k https://api.${{ env.DOMAIN_NAME }}/health || exit 1
+
+      - name: Notify success
+        if: success()
+        run: echo "✅ Deployment succeeded!"
