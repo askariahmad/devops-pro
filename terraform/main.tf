@@ -225,9 +225,10 @@ resource "azurerm_managed_redis" "redis" {
   sku_name            = "Balanced_B3"
 
   default_database {
-    client_protocol        = "Encrypted"
-    clustering_policy      = "OSSCluster"
-    eviction_policy        = "VolatileLRU"
+    client_protocol                    = "Encrypted"
+    clustering_policy                  = "OSSCluster"
+    eviction_policy                    = "VolatileLRU"
+    access_keys_authentication_enabled = true
   }
 }
 
