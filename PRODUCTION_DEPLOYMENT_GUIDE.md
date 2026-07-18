@@ -596,6 +596,23 @@ During deployment to real Azure, you might run into common regional, authorizati
   docker build -t "${acrLoginServer}/${service}:latest" -f "${service}/Dockerfile" .
   ```
 
+#### 13.8 Terraform State Mismatches and Duplicate Resources (`Unexpected Identity Change`)
+* **Error**: `Unexpected Identity Change: During the read operation, the Terraform Provider unexpectedly returned a different identity...` or `Failed to create deployment: deployments.apps "aks-kafka" already exists`.
+* **Cause**: When a deployment fails or times out during rollout, the Terraform Kubernetes provider can store a corrupted or incomplete resource identity in its state file. When you try to modify it, the state becomes inconsistent with the actual cluster resources.
+* **Resolution**:
+  1. Remove the corrupted resource from the Terraform state:
+     ```powershell
+     terraform -chdir=terraform state rm kubernetes_deployment_v1.kafka[0]
+     ```
+  2. Manually delete the orphaned conflicting resource from the AKS cluster:
+     ```powershell
+     kubectl delete deployment aks-kafka
+     ```
+  3. Re-run the apply command to cleanly re-create the resource:
+     ```powershell
+     terraform -chdir=terraform apply -var="create_azure_infra=true"
+     ```
+
 ---
 
 ### 14. User Role Management
