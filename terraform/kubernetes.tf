@@ -263,11 +263,11 @@ resource "kubernetes_deployment_v1" "kafka" {
           resources {
             requests = {
               cpu    = "50m"
-              memory = "256Mi"
+              memory = "384Mi"
             }
             limits = {
               cpu    = "200m"
-              memory = "512Mi"
+              memory = "768Mi"
             }
           }
 
@@ -306,6 +306,10 @@ resource "kubernetes_deployment_v1" "kafka" {
           env {
             name  = "CLUSTER_ID"
             value = "Mk3OEYBSD34fcwNTJENDM2Qk"
+          }
+          env {
+            name  = "KAFKA_JVM_PERFORMANCE_OPTS"
+            value = "-Xms256m -Xmx400m -XX:+UseG1GC"
           }
 
           port {
