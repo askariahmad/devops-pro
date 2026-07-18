@@ -492,24 +492,120 @@ spec:
 
 Create `.github/workflows/deploy.yml` with the same stages using Azure login action (`azure/login@v2`).
 
----
+### 10. Domain, HTTPS (TLS), and NGINX Ingress
 
-### 10. Domain, TLS & DNS
+To secure your production application and enable Microsoft Entra ID authentication without browser restrictions, you must set up HTTPS using an Ingress Controller and automatic SSL certificates.
 
-1. **Purchase / assign a custom domain** (e.g., `app.example.com`).
-2. **Create an Azure DNS zone** (Terraform) and add an **A record** pointing to the Static Web App’s *custom domain* endpoint or the AKS Ingress public IP.
+#### 10.1 Install Helm on Windows
+If you do not have the Kubernetes package manager (Helm) installed locally, install it via the Windows Package Manager:
+```powershell
+# Install Helm
+winget install Helm.Helm
+```
+*Note: Restart your PowerShell window after installation for the `helm` command to become available in your PATH.*
 
-   ```hcl
-   resource "azurerm_dns_a_record" "ui" {
-     name                = "app"
-     zone_name           = var.domain_name
-     resource_group_name = var.resource_group_name
-     ttl                 = 300
-     records             = [azurerm_static_site.devops_pro_ui.default_hostname]
-   }
+#### 10.2 Install NGINX Ingress Controller
+NGINX Ingress acts as the entry point and reverse proxy for your cluster:
+```powershell
+# Add NGINX Ingress Helm repo
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install NGINX Ingress Controller in namespace 'ingress-basic'
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+    --namespace ingress-basic --create-namespace
+```
+
+#### 10.3 Install cert-manager
+`cert-manager` automates the requesting and renewing of SSL/TLS certificates from Let's Encrypt:
+```powershell
+# Add Jetstack Helm repo
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# Install cert-manager
+helm install cert-manager jetstack/cert-manager \
+    --namespace cert-manager --create-namespace \
+    --set installCRDs=true
+```
+
+#### 10.4 Assign a Free Azure FQDN Domain to the Ingress IP
+Since NGINX Ingress acts as your entry point, it creates its own public LoadBalancer IP. We can map a free Azure DNS domain to it:
+
+1. Retrieve the new Ingress external IP address:
+   ```powershell
+   kubectl get service -n ingress-basic
    ```
+2. Find the IP resource name in your AKS node resource group (replace `<INGRESS_IP>` with the external IP above):
+   ```powershell
+   az network public-ip list \
+       --resource-group "MC_devops-pro-prod-rg_devops-pro-prod-aks_centralindia" \
+       --query "[?ipAddress=='<INGRESS_IP>'].{name:name}" -o tsv
+   ```
+3. Assign a unique DNS label to the resource name:
+   ```powershell
+   az network public-ip update \
+       --resource-group "MC_devops-pro-prod-rg_devops-pro-prod-aks_centralindia" \
+       --name "<RESOURCE_NAME>" \
+       --dns-name "devops-pro-ui-prod"
+   ```
+This maps your IP to the free domain: `devops-pro-ui-prod.centralindia.cloudapp.azure.com`.
 
-3. **TLS** is provisioned automatically by Azure for both Static Web Apps and AKS Ingress (managed cert). No manual certificates required.
+#### 10.5 Apply Let's Encrypt Certificate Issuer
+Create a file `letsencrypt-issuer.yaml` to specify the Let's Encrypt signing authority:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+Apply it:
+```powershell
+kubectl apply -f letsencrypt-issuer.yaml
+```
+
+#### 10.6 Deploy Ingress Routing
+Create a file `frontend-ingress.yaml` to route domain traffic to your frontend pod and secure it with TLS:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devops-pro-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - devops-pro-ui-prod.centralindia.cloudapp.azure.com
+    secretName: devops-pro-ui-tls
+  rules:
+  - host: devops-pro-ui-prod.centralindia.cloudapp.azure.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard-ui
+            port:
+              number: 80
+```
+Apply it:
+```powershell
+kubectl apply -f frontend-ingress.yaml
+```
 
 ---
 
