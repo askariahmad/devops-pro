@@ -230,6 +230,8 @@ variable "service_triggers" {
 resource "kubernetes_deployment_v1" "kafka" {
   count = var.create_azure_infra ? 1 : 0
 
+  wait_for_rollout = false
+
   metadata {
     name = "aks-kafka"
     labels = {
@@ -256,7 +258,7 @@ resource "kubernetes_deployment_v1" "kafka" {
       spec {
         container {
           name  = "kafka"
-          image = "bitnami/kafka:3.6.1"
+          image = "apache/kafka:3.7.0"
 
           resources {
             requests = {
@@ -270,36 +272,40 @@ resource "kubernetes_deployment_v1" "kafka" {
           }
 
           env {
-            name  = "KAFKA_CFG_NODE_ID"
-            value = "0"
+            name  = "KAFKA_NODE_ID"
+            value = "1"
           }
           env {
-            name  = "KAFKA_CFG_PROCESS_ROLES"
-            value = "controller,broker"
+            name  = "KAFKA_PROCESS_ROLES"
+            value = "broker,controller"
           }
           env {
-            name  = "KAFKA_CFG_LISTENERS"
-            value = "PLAINTEXT://:9092,CONTROLLER://:9093"
+            name  = "KAFKA_LISTENERS"
+            value = "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
           }
           env {
-            name  = "KAFKA_CFG_ADVERTISED_LISTENERS"
+            name  = "KAFKA_ADVERTISED_LISTENERS"
             value = "PLAINTEXT://aks-kafka-internal:9092"
           }
           env {
-            name  = "KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP"
+            name  = "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP"
             value = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
           }
           env {
-            name  = "KAFKA_CFG_CONTROLLER_QUORUM_VOTERS"
-            value = "0@127.0.0.1:9093"
+            name  = "KAFKA_CONTROLLER_QUORUM_VOTERS"
+            value = "1@localhost:9093"
           }
           env {
-            name  = "KAFKA_CFG_CONTROLLER_LISTENER_NAMES"
+            name  = "KAFKA_CONTROLLER_LISTENER_NAMES"
             value = "CONTROLLER"
           }
           env {
-            name  = "ALLOW_PLAINTEXT_LISTENER"
-            value = "yes"
+            name  = "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR"
+            value = "1"
+          }
+          env {
+            name  = "CLUSTER_ID"
+            value = "Mk3OEYBSD34fcwNTJENDM2Qk"
           }
 
           port {
