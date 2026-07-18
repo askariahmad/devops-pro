@@ -226,3 +226,108 @@ variable "service_triggers" {
   type        = map(string)
   default     = {}
 }
+
+resource "kubernetes_deployment_v1" "kafka" {
+  count = var.create_azure_infra ? 1 : 0
+
+  metadata {
+    name = "aks-kafka"
+    labels = {
+      app = "aks-kafka"
+    }
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "aks-kafka"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "aks-kafka"
+        }
+      }
+
+      spec {
+        container {
+          name  = "kafka"
+          image = "bitnami/kafka:3.6.1"
+
+          resources {
+            requests = {
+              cpu    = "50m"
+              memory = "256Mi"
+            }
+            limits = {
+              cpu    = "200m"
+              memory = "512Mi"
+            }
+          }
+
+          env {
+            name  = "KAFKA_CFG_NODE_ID"
+            value = "0"
+          }
+          env {
+            name  = "KAFKA_CFG_PROCESS_ROLES"
+            value = "controller,broker"
+          }
+          env {
+            name  = "KAFKA_CFG_LISTENERS"
+            value = "PLAINTEXT://:9092,CONTROLLER://:9093"
+          }
+          env {
+            name  = "KAFKA_CFG_ADVERTISED_LISTENERS"
+            value = "PLAINTEXT://aks-kafka-internal:9092"
+          }
+          env {
+            name  = "KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP"
+            value = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+          }
+          env {
+            name  = "KAFKA_CFG_CONTROLLER_QUORUM_VOTERS"
+            value = "0@127.0.0.1:9093"
+          }
+          env {
+            name  = "KAFKA_CFG_CONTROLLER_LISTENER_NAMES"
+            value = "CONTROLLER"
+          }
+          env {
+            name  = "ALLOW_PLAINTEXT_LISTENER"
+            value = "yes"
+          }
+
+          port {
+            container_port = 9092
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "kafka" {
+  count = var.create_azure_infra ? 1 : 0
+
+  metadata {
+    name = "aks-kafka-internal"
+  }
+
+  spec {
+    selector = {
+      app = "aks-kafka"
+    }
+
+    port {
+      port        = 9092
+      target_port = 9092
+    }
+
+    type = "ClusterIP"
+  }
+}
