@@ -1,0 +1,11 @@
+{
+  "caveman-compression": {
+    "enabled": true,
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python .agents/scripts/compress_prompt.py"
+      }
+    ]
+  }
+}

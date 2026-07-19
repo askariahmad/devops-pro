@@ -437,6 +437,15 @@ kubectl apply -f helm/dashboard-ui/values.yaml \
   - `api-client-secret` (value from step 3)
   - `jwt-signing-key` (RSA key pair)
 
+You can set these secrets using the Azure CLI:
+```powershell
+# Set the API Client Secret
+az keyvault secret set --vault-name "devops-pro-prod-kv" --name "api-client-secret" --value "<YOUR_CLIENT_SECRET>"
+
+# Set the JWT Signing Key
+az keyvault secret set --vault-name "devops-pro-prod-kv" --name "jwt-signing-key" --value "<YOUR_JWT_SIGNING_KEY>"
+```
+
 - **Inject into AKS** using **Azure Key Vault Provider** (installed by Terraform):
 
 ```yaml
@@ -483,24 +492,120 @@ spec:
 
 Create `.github/workflows/deploy.yml` with the same stages using Azure login action (`azure/login@v2`).
 
----
+### 10. Domain, HTTPS (TLS), and NGINX Ingress
 
-### 10. Domain, TLS & DNS
+To secure your production application and enable Microsoft Entra ID authentication without browser restrictions, you must set up HTTPS using an Ingress Controller and automatic SSL certificates.
 
-1. **Purchase / assign a custom domain** (e.g., `app.example.com`).
-2. **Create an Azure DNS zone** (Terraform) and add an **A record** pointing to the Static Web App’s *custom domain* endpoint or the AKS Ingress public IP.
+#### 10.1 Install Helm on Windows
+If you do not have the Kubernetes package manager (Helm) installed locally, install it via the Windows Package Manager:
+```powershell
+# Install Helm
+winget install Helm.Helm
+```
+*Note: Restart your PowerShell window after installation for the `helm` command to become available in your PATH.*
 
-   ```hcl
-   resource "azurerm_dns_a_record" "ui" {
-     name                = "app"
-     zone_name           = var.domain_name
-     resource_group_name = var.resource_group_name
-     ttl                 = 300
-     records             = [azurerm_static_site.devops_pro_ui.default_hostname]
-   }
+#### 10.2 Install NGINX Ingress Controller
+NGINX Ingress acts as the entry point and reverse proxy for your cluster:
+```powershell
+# Add NGINX Ingress Helm repo
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install NGINX Ingress Controller in namespace 'ingress-basic'
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+    --namespace ingress-basic --create-namespace
+```
+
+#### 10.3 Install cert-manager
+`cert-manager` automates the requesting and renewing of SSL/TLS certificates from Let's Encrypt:
+```powershell
+# Add Jetstack Helm repo
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# Install cert-manager
+helm install cert-manager jetstack/cert-manager \
+    --namespace cert-manager --create-namespace \
+    --set installCRDs=true
+```
+
+#### 10.4 Assign a Free Azure FQDN Domain to the Ingress IP
+Since NGINX Ingress acts as your entry point, it creates its own public LoadBalancer IP. We can map a free Azure DNS domain to it:
+
+1. Retrieve the new Ingress external IP address:
+   ```powershell
+   kubectl get service -n ingress-basic
    ```
+2. Find the IP resource name in your AKS node resource group (replace `<INGRESS_IP>` with the external IP above):
+   ```powershell
+   az network public-ip list \
+       --resource-group "MC_devops-pro-prod-rg_devops-pro-prod-aks_centralindia" \
+       --query "[?ipAddress=='<INGRESS_IP>'].{name:name}" -o tsv
+   ```
+3. Assign a unique DNS label to the resource name:
+   ```powershell
+   az network public-ip update \
+       --resource-group "MC_devops-pro-prod-rg_devops-pro-prod-aks_centralindia" \
+       --name "<RESOURCE_NAME>" \
+       --dns-name "devops-pro-ui-prod"
+   ```
+This maps your IP to the free domain: `devops-pro-ui-prod.centralindia.cloudapp.azure.com`.
 
-3. **TLS** is provisioned automatically by Azure for both Static Web Apps and AKS Ingress (managed cert). No manual certificates required.
+#### 10.5 Apply Let's Encrypt Certificate Issuer
+Create a file `letsencrypt-issuer.yaml` to specify the Let's Encrypt signing authority:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+Apply it:
+```powershell
+kubectl apply -f letsencrypt-issuer.yaml
+```
+
+#### 10.6 Deploy Ingress Routing
+Create a file `frontend-ingress.yaml` to route domain traffic to your frontend pod and secure it with TLS:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devops-pro-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - devops-pro-ui-prod.centralindia.cloudapp.azure.com
+    secretName: devops-pro-ui-tls
+  rules:
+  - host: devops-pro-ui-prod.centralindia.cloudapp.azure.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dashboard-ui
+            port:
+              number: 80
+```
+Apply it:
+```powershell
+kubectl apply -f frontend-ingress.yaml
+```
 
 ---
 
@@ -586,6 +691,51 @@ During deployment to real Azure, you might run into common regional, authorizati
   ```powershell
   docker build -t "${acrLoginServer}/${service}:latest" -f "${service}/Dockerfile" .
   ```
+
+#### 13.8 Terraform State Mismatches and Duplicate Resources (`Unexpected Identity Change`)
+* **Error**: `Unexpected Identity Change: During the read operation, the Terraform Provider unexpectedly returned a different identity...` or `Failed to create deployment: deployments.apps "aks-kafka" already exists`.
+* **Cause**: When a deployment fails or times out during rollout, the Terraform Kubernetes provider can store a corrupted or incomplete resource identity in its state file. When you try to modify it, the state becomes inconsistent with the actual cluster resources.
+* **Resolution**:
+  1. Remove the corrupted resource from the Terraform state:
+     ```powershell
+     terraform -chdir=terraform state rm kubernetes_deployment_v1.kafka[0]
+     ```
+  2. Manually delete the orphaned conflicting resource from the AKS cluster:
+     ```powershell
+     kubectl delete deployment aks-kafka
+     ```
+  3. Re-run the apply command to cleanly re-create the resource:
+     ```powershell
+     terraform -chdir=terraform apply -var="create_azure_infra=true"
+     ```
+
+---
+
+### 14. User Role Management
+
+DevOps Pro uses Role-Based Access Control (RBAC) to enforce security boundaries. Roles govern permissions such as triggering SAST scans, editing configurations, or synchronizing Jira tickets.
+
+#### 14.1 Predefined Roles & Permissions
+The system defines 4 default user roles, ordered from highest to lowest privilege:
+1. **`ROLE_SYSTEM_ADMIN`**: Full read/write access across all system settings, configurations, and incidents for all tenants.
+2. **`ROLE_TENANT_ADMIN`**: Allowed to edit configurations and add repositories for their specific tenant.
+3. **`ROLE_SECURITY_ENGINEER`**: Allowed to view and transition security incidents, trigger manual scans, and initiate code auto-fixes.
+4. **`ROLE_DEVELOPER_VIEWER`**: Read-only access to view logs, metrics, repository scan summaries, and active incidents.
+
+#### 14.2 Role Mapping: Local Accounts (MongoDB)
+For users utilizing standard email/password logins, roles are stored statically in the database:
+- **Default Seeding**: Seeded users are configured in `gateway-service` under [`DataSeeder.java`](file:///C:/Users/ahmad/IdeaProjects/devops-pro/gateway-service/src/main/java/com/devops/gateway/config/DataSeeder.java).
+- **Modification**: You can modify roles for existing accounts by directly updating the `role` field on user documents in your Cosmos DB MongoDB collection, or by creating a signup registration API flow.
+
+#### 14.3 Role Mapping: Microsoft Entra ID (Azure AD)
+When authenticating via Entra ID, the application dynamically resolves the user's role on login based on their email prefix inside `gateway-service`'s [`AuthController.java`](file:///C:/Users/ahmad/IdeaProjects/devops-pro/gateway-service/src/main/java/com/devops/gateway/controller/AuthController.java):
+- Emails starting with `sysadmin` ➔ **`ROLE_SYSTEM_ADMIN`**
+- Emails starting with `tenantadmin` ➔ **`ROLE_TENANT_ADMIN`**
+- Emails starting with `security` ➔ **`ROLE_SECURITY_ENGINEER`**
+- Emails starting with `dev` ➔ **`ROLE_DEVELOPER_VIEWER`**
+- All other domains/emails ➔ Defaults to **`ROLE_DEVELOPER_VIEWER`**
+
+*To customize these mappings (e.g., using Entra ID AD Groups or App Roles claims), modify the `entraLogin()` method inside `AuthController.java` to extract the roles from the JWT token claims.*
 
 ---
 

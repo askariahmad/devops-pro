@@ -38,11 +38,11 @@ locals {
 
   # Environment variables for Azure production
   env_vars_azure = [
-    { name = "SPRING_DATA_MONGODB_URI", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_cosmosdb_account.cosmosdb[0].primary_mongodb_connection_string : "mongodb://host.docker.internal:27017" },
+    { name = "SPRING_DATA_MONGODB_URI", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_cosmosdb_account.cosmosdb[0].primary_mongodb_connection_string) : "mongodb://host.docker.internal:27017" },
     { name = "SPRING_DATA_REDIS_HOST", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].hostname : "host.docker.internal" },
     { name = "SPRING_DATA_REDIS_PORT", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "10000" : "6379" },
     { name = "SPRING_DATA_REDIS_SSL_ENABLED", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "true" : "false" },
-    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? azurerm_managed_redis.redis[0].default_database[0].primary_access_key : "" },
+    { name = "SPRING_DATA_REDIS_PASSWORD", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_managed_redis.redis[0].default_database[0].primary_access_key) : "" },
     { name = "KAFKA_BROKERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "SPRING_KAFKA_BOOTSTRAP_SERVERS", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "aks-kafka-internal:9092" : "host.docker.internal:4577" },
     { name = "AUTH_URL", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? "https://devops-pro-${var.environment}-aks.azure.com" : "http://host.docker.internal:4577" },
@@ -133,7 +133,8 @@ resource "kubernetes_deployment_v1" "services" {
       spec {
         container {
           name  = each.key
-          image = "${azurerm_container_registry.acr.login_server}/${each.key}:latest"
+          image             = "${azurerm_container_registry.acr.login_server}/${each.key}:latest"
+          image_pull_policy = "Always"
 
           # Resource limits adjusted for single-node cluster resource constraints
           resources {
@@ -225,4 +226,119 @@ variable "service_triggers" {
   description = "Triggers to force redeploying specific services"
   type        = map(string)
   default     = {}
+}
+
+resource "kubernetes_deployment_v1" "kafka" {
+  count = var.create_azure_infra ? 1 : 0
+
+  wait_for_rollout = false
+
+  metadata {
+    name = "aks-kafka"
+    labels = {
+      app = "aks-kafka"
+    }
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        app = "aks-kafka"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          app = "aks-kafka"
+        }
+      }
+
+      spec {
+        container {
+          name  = "kafka"
+          image = "apache/kafka:3.7.0"
+
+          resources {
+            requests = {
+              cpu    = "50m"
+              memory = "384Mi"
+            }
+            limits = {
+              cpu    = "200m"
+              memory = "768Mi"
+            }
+          }
+
+          env {
+            name  = "KAFKA_NODE_ID"
+            value = "1"
+          }
+          env {
+            name  = "KAFKA_PROCESS_ROLES"
+            value = "broker,controller"
+          }
+          env {
+            name  = "KAFKA_LISTENERS"
+            value = "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+          }
+          env {
+            name  = "KAFKA_ADVERTISED_LISTENERS"
+            value = "PLAINTEXT://aks-kafka-internal:9092"
+          }
+          env {
+            name  = "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP"
+            value = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+          }
+          env {
+            name  = "KAFKA_CONTROLLER_QUORUM_VOTERS"
+            value = "1@localhost:9093"
+          }
+          env {
+            name  = "KAFKA_CONTROLLER_LISTENER_NAMES"
+            value = "CONTROLLER"
+          }
+          env {
+            name  = "KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR"
+            value = "1"
+          }
+          env {
+            name  = "CLUSTER_ID"
+            value = "Mk3OEYBSD34fcwNTJENDM2Qk"
+          }
+          env {
+            name  = "KAFKA_JVM_PERFORMANCE_OPTS"
+            value = "-Xms256m -Xmx400m -XX:+UseG1GC"
+          }
+
+          port {
+            container_port = 9092
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service_v1" "kafka" {
+  count = var.create_azure_infra ? 1 : 0
+
+  metadata {
+    name = "aks-kafka-internal"
+  }
+
+  spec {
+    selector = {
+      app = "aks-kafka"
+    }
+
+    port {
+      port        = 9092
+      target_port = 9092
+    }
+
+    type = "ClusterIP"
+  }
 }
