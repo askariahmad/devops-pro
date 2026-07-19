@@ -26,6 +26,8 @@ jobs:
       # 1. Checkout codebase
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       # 2. Set up Java JDK 21
       - name: Set up JDK 21
