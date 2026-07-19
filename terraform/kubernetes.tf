@@ -4,8 +4,8 @@ provider "kubernetes" {
 
 locals {
   services = {
-    "dashboard-ui"          = "LoadBalancer"
-    "gateway-service"       = "LoadBalancer"
+    "dashboard-ui"          = "ClusterIP"
+    "gateway-service"       = "ClusterIP"
     "config-service"        = "ClusterIP"
     "incident-service"      = "ClusterIP"
     "repo-scanner-service"  = "ClusterIP"
