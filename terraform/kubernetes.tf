@@ -133,7 +133,8 @@ resource "kubernetes_deployment_v1" "services" {
       spec {
         container {
           name  = each.key
-          image = "${azurerm_container_registry.acr.login_server}/${each.key}:latest"
+          image             = "${azurerm_container_registry.acr.login_server}/${each.key}:latest"
+          image_pull_policy = "Always"
 
           # Resource limits adjusted for single-node cluster resource constraints
           resources {
