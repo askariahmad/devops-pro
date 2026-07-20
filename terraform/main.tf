@@ -275,3 +275,17 @@ output "resource_group_name" {
 output "acr_login_server" {
   value = azurerm_container_registry.acr.login_server
 }
+
+resource "azurerm_key_vault_secret" "entra_client_id" {
+  count        = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? 1 : 0
+  name         = "entra-client-id"
+  value        = var.azure_client_id
+  key_vault_id = azurerm_key_vault.keyvault[0].id
+}
+
+resource "azurerm_key_vault_secret" "entra_tenant_id" {
+  count        = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? 1 : 0
+  name         = "entra-tenant-id"
+  value        = var.azure_tenant_id
+  key_vault_id = azurerm_key_vault.keyvault[0].id
+}
