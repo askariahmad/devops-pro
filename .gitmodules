@@ -1,24 +1,24 @@
 [submodule "config-service"]
 	path = config-service
-	url = ./config-service
+	url = ../config-service
 [submodule "dashboard-ui"]
 	path = dashboard-ui
-	url = ./dashboard-ui
+	url = ../dashboard-ui
 [submodule "gateway-service"]
 	path = gateway-service
-	url = ./gateway-service
+	url = ../gateway-service
 [submodule "incident-service"]
 	path = incident-service
-	url = ./incident-service
+	url = ../incident-service
 [submodule "log-analyzer-service"]
 	path = log-analyzer-service
-	url = ./log-analyzer-service
+	url = ../log-analyzer-service
 [submodule "log-collector-service"]
 	path = log-collector-service
-	url = ./log-collector-service
+	url = ../log-collector-service
 [submodule "notification-service"]
 	path = notification-service
-	url = ./notification-service
+	url = ../notification-service
 [submodule "repo-scanner-service"]
 	path = repo-scanner-service
-	url = ./repo-scanner-service
+	url = ../repo-scanner-service
