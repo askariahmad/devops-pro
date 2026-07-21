@@ -4,8 +4,8 @@ provider "kubernetes" {
 
 locals {
   services = {
-    "dashboard-ui"          = "LoadBalancer"
-    "gateway-service"       = "LoadBalancer"
+    "dashboard-ui"          = "ClusterIP"
+    "gateway-service"       = "ClusterIP"
     "config-service"        = "ClusterIP"
     "incident-service"      = "ClusterIP"
     "repo-scanner-service"  = "ClusterIP"
@@ -73,7 +73,9 @@ locals {
       { name = "ANALYZER_SERVICE_URL", value = "http://log-analyzer-service" },
       { name = "SCANNER_SERVICE_URL", value = "http://repo-scanner-service" },
       { name = "INCIDENT_SERVICE_URL", value = "http://incident-service" },
-      { name = "NOTIFICATION_SERVICE_URL", value = "http://notification-service" }
+      { name = "NOTIFICATION_SERVICE_URL", value = "http://notification-service" },
+      { name = "AZURE_CLIENT_ID", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_key_vault_secret.entra_client_id[0].value) : var.azure_client_id },
+      { name = "AZURE_TENANT_ID", value = (var.create_azure_infra && var.create_cosmos_and_keyvault) ? nonsensitive(azurerm_key_vault_secret.entra_tenant_id[0].value) : var.azure_tenant_id }
     ]
 
     "config-service" = []
