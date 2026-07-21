@@ -1,0 +1,11 @@
+# Ignore heavy directories to make docker build context instant
+**/node_modules
+**/target
+**/.terraform
+**/.git
+**/.venv
+**/dist
+**/.junie
+**/.idea
+*.tfstate*
+*.out
